@@ -690,7 +690,7 @@ export class WorldRenderer {
     const { w, h } = this.info;
     const next = new Set<number>();
     for (const c of this.camps.values()) {
-      const R = c.settled ? 4 : 2;
+      const R = c.townR ? c.townR + 1 : c.settled ? 4 : 2;
       const bx = Math.round(c.tx), by = Math.round(c.ty);
       for (let dy = -R; dy <= R; dy++) {
         for (let dx = -R; dx <= R; dx++) {
@@ -1740,6 +1740,8 @@ export class CampSprite {
   dwelling: BandView['dwelling'] = 'none';
   building: { s: Sprite; base: string; t0: number; flip: boolean }[] = [];
   ship: Sprite | null = null;
+  /** how far the town reaches, in tiles (0 for a village or a camp) */
+  townR = 0;
   shipKind = 'galleon';
 
   constructor(r: WorldRenderer, b: BandView) {
@@ -1794,6 +1796,28 @@ export class CampSprite {
     return { x: p.x - this.pos.x, y: p.y - this.pos.y };
   }
 
+  /** the town's own tiles within R steps, nearest first (not the middle one, where the fire is) */
+  private townTiles(R: number): [number, number][] {
+    const bx = Math.round(this.tx), by = Math.round(this.ty);
+    const L0 = this.r.levelAt(bx, by);
+    const out: [number, number, number][] = [];
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const d = Math.hypot(dx, dy);
+      if (d < 0.5 || d > R + 0.4) continue;
+      // two streets cross at the fire: no buildings on them
+      if ((dx === 0 || dy === 0) && d >= 1.5) continue;
+      const x = bx + dx, y = by + dy;
+      if (!this.r.walkable(x, y) || Math.abs(this.r.levelAt(x, y) - L0) > 1) continue;
+      out.push([x, y, d + hash(x, y + 77) * 0.4]);
+    }
+    return out.sort((p, q) => p[2] - q[2]).map(([x, y]) => [x, y]);
+  }
+
+  private tileSpot([x, y]: [number, number]): { x: number; y: number } {
+    const p = this.r.tileTop(x, y);
+    return { x: p.x - this.pos.x, y: p.y - this.pos.y };
+  }
+
   /** the first good spot on a ring: the wanted one, then closer in, then a little to the side */
   private ringSpot(a: number, rad: number): { x: number; y: number } | null {
     for (const [k, da] of [[1, 0], [0.7, 0], [1, 0.35], [1, -0.35], [0.45, 0], [0.7, 0.6], [0.7, -0.6]]) {
@@ -1827,9 +1851,8 @@ export class CampSprite {
         .poly([-4, 0, 4, 0, 0, 5]).fill(b.color);
       this.label.position.set(0, -2);
     }
-    this.updateFields(b);
     this.updateTrodden(b);
-    const n = Math.max(1, Math.min(10, Math.round(b.size / (b.dwelling === 'house' ? 6 : 5))));
+    let n = Math.max(1, Math.min(10, Math.round(b.size / (b.dwelling === 'house' ? 6 : 5))));
     const techs = new Set(b.techIds ?? b.techs);
     let props = PROPS.filter(([tech, sp, settled]) => techs.has(tech) && (settled === null || settled === b.settled) && this.r.atlas.has(sp)).map(([, s]) => s);
     // a big village keeps only its newest things around it (later techs are later in the list)
@@ -1852,6 +1875,11 @@ export class CampSprite {
     props = [...walls, ...rest.slice(-(12 - walls.length))];
     // walls make a village a town: stone houses, and a temple once it keeps a calendar
     const town = b.dwelling === 'house' && techs.has('walls') && this.r.atlas.has('townb3');
+    // a town spreads out as it grows: every building on its own tile, the things around it further out
+    const tiles = town ? this.townTiles(Math.max(2, Math.min(5, 2 + Math.floor(b.size / 150)))) : [];
+    this.townR = town ? Math.max(2, Math.min(5, 2 + Math.floor(b.size / 150))) : 0;
+    if (town) n = Math.max(4, Math.min(tiles.length - Math.min(props.length, Math.floor(tiles.length / 3)), Math.round(b.size / 22)));
+    this.updateFields(b);
     // iron age towns: courtyard houses, the king's palace in a capital, a theatre and a school
     const capital = !!b.kingdom?.capital;
     const cold = this.r.tempAt(b.x, b.y) < 0.35;
@@ -1892,7 +1920,7 @@ export class CampSprite {
             else if (k === 7) name = 'store';
             else if (k === 8 && techs.has('academy')) name = 'museum';
             else if (k === 9 && techs.has('theatre')) name = 'theatre2';
-            else name = h < 0.6 ? 'flatsb3' : h < 0.85 ? 'villa' : 'brickb3';
+            else name = h < 0.4 ? 'flatsb3' : h < 0.7 ? 'villa' : h < 0.85 ? 'brickb3' : 'timberb3';
           } else if (town && early) {
             // brick gable houses round the palace (in a capital), the observatory, the bank, the coffee house and the printers
             if (k === 0) name = capital && techs.has('palace') ? 'baroqueb3' : techs.has('castle') ? 'keepb3' : 'villab3';
@@ -1921,7 +1949,7 @@ export class CampSprite {
       }
       const a = (k / n) * Math.PI * 2 + 0.6;
       const rad = (b.dwelling === 'house' ? 26 : 19) + (k % 2) * 7;
-      const q = this.ringSpot(a, rad);
+      const q = town ? (tiles[k] ? this.tileSpot(tiles[k]) : null) : this.ringSpot(a, rad);
       if (!q) continue;
       const s = A.sprite(name);
       if (h < 0.5) s.scale.x *= -1;
@@ -1938,7 +1966,7 @@ export class CampSprite {
     props.forEach((name, k) => {
       const a = (k / Math.max(5, props.length)) * Math.PI * 2 + 2.1;
       const rad = (b.dwelling === 'house' ? 40 : 32) + (k % 2) * 5;
-      const q = this.ringSpot(a, rad);
+      const q = town && tiles[n + k] ? this.tileSpot(tiles[n + k]) : this.ringSpot(a, town ? (this.townR + 0.6) * TW * 0.7 : rad);
       if (!q) return;
       const s = A.sprite(name);
       s.position.set(q.x, q.y);
@@ -2011,13 +2039,14 @@ export class CampSprite {
     // ploughed in early spring, sprouts, tall wheat in summer, stubble and sheaves after the harvest
     const stage = m >= 2 && m <= 3 ? 0 : m <= 5 && m >= 4 ? 1 : m >= 6 && m <= 8 ? 2 : m >= 9 && m <= 10 ? 3 : 0;
     const bx = Math.round(b.x), by = Math.round(b.y);
-    const fkey = `${bx}:${by}:${count}:${stage}`;
+    const fkey = `${bx}:${by}:${count}:${stage}:${this.townR}`;
     if (fkey === this.fieldKey) return;
     this.fieldKey = fkey;
     this.fields.removeChildren().forEach((c) => c.destroy());
     if (!count) return;
     const A = this.r.atlas;
-    const ring: [number, number][] = [[3, 0], [0, 3], [3, 1], [1, 3], [3, -1], [-1, 3], [4, 0], [0, 4], [4, 1], [1, 4], [-3, 0], [0, -3]];
+    const off = this.townR ? this.townR + 1 : 3;
+    const ring: [number, number][] = [[off, 0], [0, off], [off, 1], [1, off], [off, -1], [-1, off], [off + 1, 0], [0, off + 1], [off + 1, 1], [1, off + 1], [-off, 0], [0, -off]];
     let placed = 0;
     for (const [dx, dy] of ring) {
       if (placed >= count) break;

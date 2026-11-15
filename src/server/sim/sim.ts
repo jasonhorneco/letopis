@@ -430,6 +430,47 @@ export class Simulation {
     if (!all.includes(id)) all.push(id);
   }
 
+  /** the biggest number of people a settled town holds before some leave to found a new village */
+  private townLimit(b: Band): number {
+    return this.hasTech(b, 'electricity') ? 900 : this.hasTech(b, 'factory') ? 700 : this.hasTech(b, 'star_fort') ? 420 : this.hasTech(b, 'castle') ? 340
+      : this.hasTech(b, 'aqueduct') ? 280 : this.hasTech(b, 'walls') ? 210 : 140;
+  }
+
+  /** once a year a walled town swallows a small village right next to it: the village becomes a quarter of the town */
+  private growTowns() {
+    const size = new Map<number, number>();
+    for (const p of this.s.people) size.set(p.bandId, (size.get(p.bandId) ?? 0) + 1);
+    const towns = this.s.bands.filter((b) => b.settled && this.hasTech(b, 'walls') && (size.get(b.id) ?? 0) >= 150)
+      .sort((a, b) => (size.get(b.id) ?? 0) - (size.get(a.id) ?? 0));
+    const gone = new Set<number>();
+    for (const t of towns) {
+      if (gone.has(t.id)) continue;
+      const ts = size.get(t.id) ?? 0;
+      // the town reaches further out once it has roads for carts, and further still with trains
+      const reach = this.hasTech(t, 'railway') ? 11 : this.hasTech(t, 'star_fort') ? 9 : 7;
+      for (const v of this.s.bands) {
+        if (v === t || gone.has(v.id) || !v.settled || dist(v, t) > reach) continue;
+        const vs = size.get(v.id) ?? 0;
+        if (vs * 2 > ts || ts + vs > this.townLimit(t) * 0.9) continue;
+        if (v.kingdom != null && t.kingdom != null && v.kingdom !== t.kingdom) continue;
+        if (this.isCapital(v) || !this.rng.chance(0.05)) continue;
+        for (const p of this.s.people) if (p.bandId === v.id) { p.bandId = t.id; p.task = 'travel'; }
+        for (const tech of v.techs) this.addTech(t, tech);
+        t.food += v.food;
+        size.set(t.id, ts + vs);
+        gone.add(v.id);
+        this.emit('merge', 2, `${this.bandLabel(t, true)} се разрасна до ${this.bandLabel(v)} и то вече е един от кварталите му.`,
+          `${this.bandLabel(t, true)} порасна толкова, че стигна до ${this.bandLabel(v)}. Сега са един голям град!`, undefined, t.id, this.bRefs(v),
+          [`${this.bandEnLabel(t, true)} grew out as far as ${this.bandEnLabel(v)}, and the village became one of the quarters of the town.`,
+            `${this.bandEnLabel(t, true)} grew so big that it reached ${this.bandEnLabel(v)}. Now they are one big town!`],
+          [`${this.bDe(t, 'nom', true)} wuchs bis ${`zu ${this.bDe(v, 'dat')}`.replace(/^zu dem /, 'zum ').replace(/^zu der /, 'zur ')} heran, und das Dorf wurde eines der Viertel der Stadt.`,
+            `${this.bDe(t, 'nom', true)} ist so groß geworden, dass es ${this.bDe(v, 'akk')} erreicht hat. Jetzt sind sie eine große Stadt!`]);
+        this.removeBand(v, t);
+        break;
+      }
+    }
+  }
+
   /** king, queen (a king's wife), prince or princess (a king's child), for the family tree */
   private royalOf(id: number, motherId: number | null, fatherId: number | null, partnerId: number | null): TreeNode['royal'] {
     const kings = this.s.kingIds;
@@ -952,6 +993,7 @@ export class Simulation {
     this.contact();
     if (this.month === 6) this.buildRoads();
     if (this.month === 7) this.kingdoms();
+    if (this.month === 8) this.growTowns();
     if (this.s.tick % 6 === 0) this.explore();
     this.randomEvents(members);
     this.checkEra();
@@ -1465,7 +1507,7 @@ export class Simulation {
       }
       // split: rare, a band has to grow big first
       // a walled town holds more people before some leave to found a new village
-      const limit = b.settled ? (this.hasTech(b, 'electricity') ? 600 : this.hasTech(b, 'factory') ? 520 : this.hasTech(b, 'star_fort') ? 420 : this.hasTech(b, 'castle') ? 340 : this.hasTech(b, 'aqueduct') ? 280 : this.hasTech(b, 'walls') ? 210 : 140) : 40 + Math.round(avg(m, (p) => p.genes.soc) * 20);
+      const limit = b.settled ? this.townLimit(b) : 40 + Math.round(avg(m, (p) => p.genes.soc) * 20);
       // too many mouths for this land: some leave to find their own
       const crowded = !b.settled && m.length >= 24 && (b.fed ?? 1) < 1.05 && this.rng.chance(0.012);
       if (m.length > limit || crowded) this.split(b, m, members);
