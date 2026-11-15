@@ -173,6 +173,22 @@ export const TECH_EN: Record<string, { name: string; text: string; kids: string 
   microscope: { name: 'Microscope', text: '{name} of {band} looked at a drop of water through a small glass and saw thousands of tiny creatures in it. Healers now know that clean water keeps illness away.', kids: '{name} saw a whole world of tiny creatures in one drop of water!' },
   palace: { name: 'Palace', text: '{name} of {band} built the king a palace with tall windows, a garden with fountains and halls for music and dancing.', kids: '{name} built the king a palace with a garden and fountains!' },
   academy: { name: 'Academy of Sciences', text: '{name} of {band} gathered the scholars into an academy. They do experiments, measure everything exactly and print their discoveries so anyone can check them.', kids: '{name} brought all the scholars together to do experiments!' },
+  steam_engine: { name: 'Steam Engine', text: '{name} of {band} shut boiling water in an iron boiler and made the steam push a piston. The machine works day and night and never gets tired. A new age begins.', kids: '{name} built a machine that runs on steam from boiling water!' },
+  balloon: { name: 'Hot Air Balloon', text: '{name} of {band} filled a huge cloth bag with hot air. The balloon rose above the roofs with two brave people in the basket, and everyone looked up.', kids: '{name} flew over the town in a balloon and waved to everyone below!' },
+  factory: { name: 'Factory', text: '{name} of {band} put a steam engine into a big brick hall, and it turned a hundred looms at once. Cloth and tools are now made quickly and cheaply.', kids: '{name} built a factory where machines weave cloth instead of people!' },
+  vaccine: { name: 'Vaccine', text: '{name} of {band} noticed that milkmaids who had caught cowpox never fell ill with smallpox. A small scratch now protects the children from the terrible disease.', kids: '{name} invented the vaccine: a tiny scratch keeps children safe from illness!' },
+  steamship: { name: 'Steamship', text: '{name} of {band} put a steam engine into a ship, and it turned two big paddle wheels on its sides. The steamship sails against the wind and when there is no wind at all.', kids: '{name} built a ship that sails without wind, with steam and wheels!' },
+  railway: { name: 'Railway', text: '{name} of {band} put a steam engine on wheels on iron rails. The train pulls dozens of wagons and reaches the next town in an hour.', kids: '{name} built a train that puffs along the rails and carries everyone!' },
+  photography: { name: 'Photography', text: '{name} of {band} pointed a box with a glass lens at the square, and a little later an exact picture of it stayed on a silver plate. Now people can keep how the world looked.', kids: '{name} made the first photograph: a picture painted by light!' },
+  telegraph: { name: 'Telegraph', text: '{name} of {band} strung a wire between two towns and sent short and long signals along it. News reaches the other end of the kingdom in an instant.', kids: '{name} sent a message along a wire, and it arrived at once!' },
+  fertilizer: { name: 'Fertiliser', text: '{name} of {band} worked out what feeds the plants and gave it to the fields. The same land now yields twice as much.', kids: '{name} invented a fertiliser that makes the fields yield twice as much!' },
+  sewer: { name: 'Sewers', text: '{name} of {band} built brick tunnels under the streets that carry the dirty water far from the town. Illnesses from dirty water almost disappeared.', kids: '{name} built tunnels under the town that carry the dirty water away!' },
+  school: { name: 'School for All', text: '{name} of {band} convinced everyone that every child should go to school. Now almost everyone in town can read and count.', kids: '{name} made a school for all children. Now everyone can read!' },
+  electricity: { name: 'Electricity', text: '{name} of {band} spun a magnet inside a coil of wire, and a current flowed along it. A glass bulb lit up without a flame, and the nights in town became bright.', kids: '{name} lit a bulb without fire. Now the town is bright at night!' },
+  automobile: { name: 'Motor Car', text: '{name} of {band} put a small engine on a cart without horses. The car rattles along the road and goes everywhere the rails do not.', kids: '{name} made a cart that runs without horses!' },
+  aviation: { name: 'Aeroplane', text: '{name} of {band} put an engine on wings of wood and cloth. The machine left the ground and flew like a bird.', kids: '{name} flew an aeroplane like a bird!' },
+  radio: { name: 'Radio', text: '{name} of {band} sent a voice and music through the air, without a wire. In every home a box with a speaker tells the news and sings songs.', kids: '{name} invented the radio: music from far away plays in a box!' },
+  antibiotics: { name: 'Antibiotics', text: '{name} of {band} noticed that a blue mould kills the germs around it. From it came a medicine that saves people from wounds and fever.', kids: '{name} found a cure in mould that beats illnesses!' },
 };
 export const TECH_BG: Record<string, string> = {
   Огън: 'fire', 'Каменни сечива': 'stone_tools', 'Познание за билките': 'herb_lore', 'Погребални обреди': 'burial', Копие: 'spear',
@@ -184,6 +200,7 @@ export const TECH_BG: Record<string, string> = {
   Желязо: 'iron', Азбука: 'alphabet', Пристанище: 'harbor', Царство: 'kingdom', Монети: 'coins', 'Писани закони': 'laws', Театър: 'theatre', Медицина: 'medicine', Акведукт: 'aqueduct', Библиотека: 'library', 'Водна мелница': 'watermill', 'Свод и бетон': 'arch',
   'Тежък плуг': 'heavy_plough', Манастир: 'monastery', Рицарство: 'knighthood', 'Трипольна система': 'three_field', Замък: 'castle', Хартия: 'paper', Гилдии: 'guilds', 'Готически храм': 'gothic', Университет: 'university', 'Вятърна мелница': 'windmill', Компас: 'compass', 'Механичен часовник': 'clock', 'Печатна преса': 'printing',
   'Океански кораб': 'caravel', 'Колонии': 'colonies', 'Фойерверки': 'fireworks', 'Картоф и царевица': 'potato', 'Банки': 'banking', 'Вестник': 'newspaper', 'Телескоп': 'telescope', 'Звездна крепост': 'star_fort', 'Поща': 'post', 'Кафене': 'coffeehouse', 'Микроскоп': 'microscope', 'Дворец': 'palace', 'Академия на науките': 'academy',
+  'Парна машина': 'steam_engine', 'Балон': 'balloon', 'Фабрика': 'factory', 'Ваксина': 'vaccine', 'Параход': 'steamship', 'Железница': 'railway', 'Фотография': 'photography', 'Телеграф': 'telegraph', 'Изкуствен тор': 'fertilizer', 'Канализация': 'sewer', 'Училище за всички': 'school', 'Електричество': 'electricity', 'Автомобил': 'automobile', 'Самолет': 'aviation', 'Радио': 'radio', 'Антибиотици': 'antibiotics',
 };
 /** every discovery the game knows, in the order history found them: [id, Bulgarian name, era] */
 export const TECH_LIST: [string, string, number][] = [
@@ -197,6 +214,7 @@ export const TECH_LIST: [string, string, number][] = [
   ['iron', 'Желязо', 3], ['alphabet', 'Азбука', 3], ['harbor', 'Пристанище', 3], ['kingdom', 'Царство', 3], ['coins', 'Монети', 3], ['laws', 'Писани закони', 3], ['theatre', 'Театър', 3], ['medicine', 'Медицина', 3], ['aqueduct', 'Акведукт', 3], ['library', 'Библиотека', 3], ['watermill', 'Водна мелница', 3], ['arch', 'Свод и бетон', 3],
   ['heavy_plough', 'Тежък плуг', 4], ['monastery', 'Манастир', 4], ['knighthood', 'Рицарство', 4], ['three_field', 'Трипольна система', 4], ['castle', 'Замък', 4], ['paper', 'Хартия', 4], ['guilds', 'Гилдии', 4], ['gothic', 'Готически храм', 4], ['university', 'Университет', 4], ['windmill', 'Вятърна мелница', 4], ['compass', 'Компас', 4], ['clock', 'Механичен часовник', 4], ['printing', 'Печатна преса', 4],
   ['caravel', 'Океански кораб', 5], ['colonies', 'Колонии', 5], ['fireworks', 'Фойерверки', 5], ['potato', 'Картоф и царевица', 5], ['banking', 'Банки', 5], ['newspaper', 'Вестник', 5], ['telescope', 'Телескоп', 5], ['star_fort', 'Звездна крепост', 5], ['post', 'Поща', 5], ['coffeehouse', 'Кафене', 5], ['microscope', 'Микроскоп', 5], ['palace', 'Дворец', 5], ['academy', 'Академия на науките', 5],
+  ['steam_engine', 'Парна машина', 6], ['balloon', 'Балон', 6], ['factory', 'Фабрика', 6], ['vaccine', 'Ваксина', 6], ['steamship', 'Параход', 6], ['railway', 'Железница', 6], ['photography', 'Фотография', 6], ['telegraph', 'Телеграф', 6], ['fertilizer', 'Изкуствен тор', 6], ['sewer', 'Канализация', 6], ['school', 'Училище за всички', 6], ['electricity', 'Електричество', 6], ['automobile', 'Автомобил', 6], ['aviation', 'Самолет', 6], ['radio', 'Радио', 6], ['antibiotics', 'Антибиотици', 6],
 ];
 
 /** a line about each discovery, for the ones still to come: [Bulgarian, English] */
@@ -267,6 +285,22 @@ export const TECH_DESC: Record<string, [string, string]> = {
   microscope: ['Цял свят в една капка вода.', 'A whole world in one drop of water.'],
   palace: ['Дворец с градина и фонтани.', 'A palace with a garden and fountains.'],
   academy: ['Учените правят опити и печатат откритията си.', 'Scholars do experiments and print their findings.'],
+  steam_engine: ['Парата бута буталото денем и нощем.', 'Steam pushes the piston day and night.'],
+  balloon: ['Горещ въздух вдига хората в небето.', 'Hot air lifts people into the sky.'],
+  factory: ['Машини правят плат и сечива за всички.', 'Machines make cloth and tools for everyone.'],
+  vaccine: ['Малка драскотина пази от голяма болест.', 'A small scratch protects from a big illness.'],
+  steamship: ['Кораб, на който не му трябва вятър.', 'A ship that needs no wind.'],
+  railway: ['Влак по железни релси.', 'A train on iron rails.'],
+  photography: ['Картина, нарисувана от светлината.', 'A picture painted by light.'],
+  telegraph: ['Новини по жица за миг.', 'News along a wire in an instant.'],
+  fertilizer: ['Храна за нивите: двойна реколта.', 'Food for the fields: a double harvest.'],
+  sewer: ['Тунели под улиците за мръсната вода.', 'Tunnels under the streets for dirty water.'],
+  school: ['Всяко дете ходи на училище.', 'Every child goes to school.'],
+  electricity: ['Светлина без пламък.', 'Light without a flame.'],
+  automobile: ['Каруца без коне.', 'A cart without horses.'],
+  aviation: ['Крила с двигател.', 'Wings with an engine.'],
+  radio: ['Глас и музика през въздуха.', 'Voice and music through the air.'],
+  antibiotics: ['Лек от синя плесен.', 'A cure from a blue mould.'],
 };
 
 /** a tech by its Bulgarian name (what the server sends) */

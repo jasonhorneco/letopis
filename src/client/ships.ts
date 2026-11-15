@@ -11,6 +11,7 @@ interface Ship { s: Sprite; path: [number, number][]; t: number; speed: number; 
 
 /** the best ship a town can build, and how many animation frames its sprite has */
 function shipOf(techs: Set<string>): [string, number] | null {
+  if (techs.has('steamship')) return Math.random() < 0.6 ? ['steamer', 4] : ['galleon', 4];
   if (techs.has('caravel')) return Math.random() < 0.6 ? ['galleon', 4] : ['caravel', 4];
   if (techs.has('compass')) return ['cog', 1];
   if (techs.has('harbor')) return ['galley', 1];

@@ -214,6 +214,22 @@ export const TECH_DE: Record<string, { name: string; text: string; kids: string 
   microscope: { name: 'Mikroskop', text: '{name} {aus band} betrachtete einen Wassertropfen durch ein kleines Glas und sah darin Tausende winziger Lebewesen. Die Heiler wissen jetzt, dass sauberes Wasser vor Krankheiten schützt.', kids: '{name} hat in einem einzigen Wassertropfen eine ganze Welt winziger Lebewesen gesehen!' },
   palace: { name: 'Palast', text: '{name} {aus band} baute dem König einen Palast mit hohen Fenstern, einem Garten mit Springbrunnen und Sälen für Musik und Tanz.', kids: '{name} hat dem König einen Palast mit Garten und Springbrunnen gebaut!' },
   academy: { name: 'Akademie der Wissenschaften', text: '{name} {aus band} versammelte die Gelehrten in einer Akademie. Sie machen Versuche, messen alles genau und drucken ihre Entdeckungen, damit jeder sie prüfen kann.', kids: '{name} hat alle Gelehrten zusammengebracht, um Versuche zu machen!' },
+  steam_engine: { name: 'Dampfmaschine', text: '{name} {aus band} schloss kochendes Wasser in einen eisernen Kessel ein und ließ den Dampf einen Kolben schieben. Die Maschine arbeitet Tag und Nacht und wird nie müde. Ein neues Zeitalter beginnt.', kids: '{name} hat eine Maschine gebaut, die mit Dampf aus kochendem Wasser läuft!' },
+  balloon: { name: 'Heißluftballon', text: '{name} {aus band} füllte einen riesigen Stoffsack mit heißer Luft. Der Ballon stieg mit zwei mutigen Menschen im Korb über die Dächer, und alle schauten nach oben.', kids: '{name} ist mit einem Ballon über die Stadt geflogen und hat allen von oben gewinkt!' },
+  factory: { name: 'Fabrik', text: '{name} {aus band} stellte eine Dampfmaschine in eine große Backsteinhalle, und sie trieb hundert Webstühle zugleich an. Stoff und Werkzeug entstehen jetzt schnell und billig.', kids: '{name} hat eine Fabrik gebaut, in der Maschinen statt Menschen Stoff weben!' },
+  vaccine: { name: 'Impfung', text: '{name} {aus band} bemerkte, dass Melkerinnen, die die Kuhpocken gehabt hatten, nie an den Pocken erkrankten. Ein kleiner Kratzer schützt die Kinder jetzt vor der schlimmen Krankheit.', kids: '{name} hat die Impfung erfunden: Ein kleiner Kratzer schützt die Kinder vor Krankheit!' },
+  steamship: { name: 'Dampfschiff', text: '{name} {aus band} baute eine Dampfmaschine in ein Schiff, und sie drehte zwei große Schaufelräder an den Seiten. Das Dampfschiff fährt auch gegen den Wind und bei Windstille.', kids: '{name} hat ein Schiff gebaut, das ohne Wind fährt, mit Dampf und Rädern!' },
+  railway: { name: 'Eisenbahn', text: '{name} {aus band} stellte eine Dampfmaschine auf Räder und auf eiserne Schienen. Der Zug zieht Dutzende Wagen und ist in einer Stunde in der Nachbarstadt.', kids: '{name} hat einen Zug gebaut, der über die Schienen schnauft und alle mitnimmt!' },
+  photography: { name: 'Fotografie', text: '{name} {aus band} richtete einen Kasten mit einer Linse auf den Platz, und kurz darauf blieb ein genaues Bild davon auf einer Silberplatte. Jetzt kann man festhalten, wie die Welt aussah.', kids: '{name} hat das erste Foto gemacht: ein Bild, das das Licht gemalt hat!' },
+  telegraph: { name: 'Telegraf', text: '{name} {aus band} spannte einen Draht zwischen zwei Städten und schickte kurze und lange Signale darüber. Nachrichten erreichen das andere Ende des Königreichs in einem Augenblick.', kids: '{name} hat eine Nachricht über einen Draht geschickt, und sie kam sofort an!' },
+  fertilizer: { name: 'Kunstdünger', text: '{name} {aus band} fand heraus, was die Pflanzen nährt, und gab es den Feldern. Dasselbe Land trägt jetzt doppelt so viel.', kids: '{name} hat einen Dünger erfunden, mit dem die Felder doppelt so viel tragen!' },
+  sewer: { name: 'Kanalisation', text: '{name} {aus band} baute unter den Straßen Tunnel aus Backstein, die das schmutzige Wasser weit aus der Stadt leiten. Krankheiten durch schmutziges Wasser verschwanden fast ganz.', kids: '{name} hat Tunnel unter der Stadt gebaut, die das schmutzige Wasser wegbringen!' },
+  school: { name: 'Schule für alle', text: '{name} {aus band} überzeugte alle, dass jedes Kind zur Schule gehen soll. Jetzt können fast alle in der Stadt lesen und rechnen.', kids: '{name} hat eine Schule für alle Kinder gemacht. Jetzt können alle lesen!' },
+  electricity: { name: 'Elektrizität', text: '{name} {aus band} drehte einen Magneten in einer Drahtspule, und Strom floss hindurch. Eine Glühbirne leuchtete ohne Flamme, und die Nächte in der Stadt wurden hell.', kids: '{name} hat eine Glühbirne ohne Feuer zum Leuchten gebracht. Jetzt ist die Stadt nachts hell!' },
+  automobile: { name: 'Automobil', text: '{name} {aus band} baute einen kleinen Motor auf einen Wagen ohne Pferde. Das Auto knattert über die Straße und kommt überall hin, wo keine Schienen sind.', kids: '{name} hat einen Wagen gebaut, der ohne Pferde fährt!' },
+  aviation: { name: 'Flugzeug', text: '{name} {aus band} baute einen Motor an Flügel aus Holz und Stoff. Die Maschine hob vom Boden ab und flog wie ein Vogel.', kids: '{name} ist mit einem Flugzeug geflogen wie ein Vogel!' },
+  radio: { name: 'Radio', text: '{name} {aus band} schickte Stimme und Musik durch die Luft, ohne Draht. In jedem Haus erzählt ein Kasten mit Lautsprecher die Nachrichten und singt Lieder.', kids: '{name} hat das Radio erfunden: In einem Kasten spielt Musik von weit her!' },
+  antibiotics: { name: 'Antibiotika', text: '{name} {aus band} bemerkte, dass ein blauer Schimmel die Keime um sich herum tötet. Daraus entstand ein Heilmittel, das Menschen vor Wundinfektionen und Fieber rettet.', kids: '{name} hat im Schimmel ein Heilmittel gefunden, das Krankheiten besiegt!' },
 };
 
 /** fill a TECH_DE text for a person and a band */
@@ -292,6 +308,22 @@ export const TECH_DESC_DE: Record<string, string> = {
   microscope: 'Eine ganze Welt in einem Wassertropfen.',
   palace: 'Ein Palast mit Garten und Springbrunnen.',
   academy: 'Gelehrte machen Versuche und drucken ihre Ergebnisse.',
+  steam_engine: 'Dampf schiebt den Kolben Tag und Nacht.',
+  balloon: 'Heiße Luft hebt Menschen in den Himmel.',
+  factory: 'Maschinen machen Stoff und Werkzeug für alle.',
+  vaccine: 'Ein kleiner Kratzer schützt vor einer großen Krankheit.',
+  steamship: 'Ein Schiff, das keinen Wind braucht.',
+  railway: 'Ein Zug auf eisernen Schienen.',
+  photography: 'Ein Bild, vom Licht gemalt.',
+  telegraph: 'Nachrichten über einen Draht in einem Augenblick.',
+  fertilizer: 'Nahrung für die Felder: doppelte Ernte.',
+  sewer: 'Tunnel unter den Straßen für schmutziges Wasser.',
+  school: 'Jedes Kind geht zur Schule.',
+  electricity: 'Licht ohne Flamme.',
+  automobile: 'Ein Wagen ohne Pferde.',
+  aviation: 'Flügel mit einem Motor.',
+  radio: 'Stimme und Musik durch die Luft.',
+  antibiotics: 'Ein Heilmittel aus blauem Schimmel.',
 };
 
 /** a tech by its Bulgarian name (what the server sends) */
@@ -316,6 +348,7 @@ export const ERA_WHY_DE: Record<number, string> = {
   3: 'Eisen gibt es überall, und es ist billiger als Bronze. Dörfer schließen sich zu Königreichen zusammen.',
   4: 'Burgen schützen die Dörfer, Klöster bewahren das Wissen, und Wind und Wasser mahlen das Mehl.',
   5: 'Schiffe überqueren das offene Meer, an fernen Küsten entstehen neue Dörfer, und Zeitungen bringen die Neuigkeiten.',
+  6: 'Dampf treibt Maschinen, Schiffe und Züge an, und Fabriken machen Waren für alle.',
 };
 
 export const MONTHS_DE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];

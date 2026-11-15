@@ -343,6 +343,34 @@ group('strollers', cells('BJ', (3,)), 'pose', PEOPLE_WPP, 0)
 group('sailors', cells('BJ', (4,)), 'pose', PEOPLE_WPP, 0)
 group('pgwalk', cells('BK', (1, 2)), 'person', 13.6, 64)
 group('pgidle', cells('BK', (3, 4)), 'person', 13.6, 64)
+# industrial age (BL props, BM factory/station/bridge, BN town, BO trains and steamers, BP workers, BQ travellers, BR watchman)
+for cid, name, w in (('BL11', 'steamengine', 0.055), ('BL12', 'powerloom', 0.055), ('BL13', 'coalcart', 0.05), ('BL14', 'girders', 0.05),
+                     ('BL21', 'sewing', 0.045), ('BL22', 'camera', 0.045), ('BL23', 'telegraph', 0.05), ('BL24', 'gaslamp', 0.035),
+                     ('BL31', 'pennyfar', 0.045), ('BL32', 'gramophone', 0.04), ('BL33', 'bulbs', 0.05), ('BL34', 'docbag', 0.045),
+                     ('BL41', 'tractor', 0.055), ('BL42', 'churns', 0.04), ('BL43', 'bench', 0.045), ('BL44', 'pump', 0.04),
+                     ('BM31', 'ironbridge', 0.085), ('BM32', 'watertower', 0.06), ('BM33', 'gasholder', 0.08), ('BM34', 'powerplant', 0.09),
+                     ('BM41', 'rail', 0.07), ('BM42', 'railcurve', 0.07), ('BM43', 'signal', 0.045), ('BM44', 'signalbox', 0.06),
+                     ('BN21', 'villa', 0.08), ('BN22', 'schoolhouse', 0.085), ('BN23', 'hospital', 0.09), ('BN24', 'store', 0.09),
+                     ('BN31', 'postoffice', 0.085), ('BN32', 'museum', 0.09), ('BN33', 'bandstand', 0.07), ('BN34', 'glassmarket', 0.09),
+                     ('BN41', 'firestation', 0.08), ('BN42', 'theatre2', 0.09), ('BN43', 'ifountain', 0.06), ('BN44', 'brickchurch', 0.08),
+                     ('BO41', 'carriage', 0.07), ('BO42', 'goodswagon', 0.065), ('BO43', 'horsetram', 0.07), ('BO44', 'motorcar', 0.055)):
+    group(name, cid, 'thing', w, 0)
+group('factoryb', cells('BM', (1,)), 'thing', 0.11, 0)    # 0..3: factory
+group('stationb', cells('BM', (2,)), 'thing', 0.11, 0)    # 0..3: railway station
+group('flatsb', cells('BN', (1,)), 'thing', 0.085, 0)     # 0..3: brick apartment house
+group('loco', cells('BO', (1,)), 'thing', 0.075, 0)       # 4 frames
+group('steamer', cells('BO', (2,)), 'thing', 0.09, 0)     # 4 frames
+group('balloon', cells('BO', (3,)), 'thing', 0.06, 0)     # 4 frames
+group('stoker', cells('BP', (1,)), 'pose', PEOPLE_WPP, 0)
+group('seamstress', cells('BP', (2,)), 'pose', PEOPLE_WPP, 0)
+group('telegraphist', cells('BP', (3,)), 'pose', PEOPLE_WPP, 0)
+group('photographer', cells('BP', (4,)), 'pose', PEOPLE_WPP, 0)
+group('cyclist', cells('BQ', (1,)), 'pose', PEOPLE_WPP, 0)
+group('pram', cells('BQ', (2,)), 'pose', PEOPLE_WPP, 0)
+group('paperboy', cells('BQ', (3,)), 'pose', PEOPLE_WPP, 0)
+group('lady', cells('BQ', (4,)), 'pose', PEOPLE_WPP, 0)
+group('wgwalk', cells('BR', (1, 2)), 'person', 13.6, 64)
+group('wgidle', cells('BR', (3, 4)), 'person', 13.6, 64)
 # band symbols (white, tinted in game), same order as SYMBOLS in render.ts
 group('sym', 'AQ101 AQ102 AQ103 AQ104 AQ105 AQ106 AQ107 AQ108 AQ109 AQ110 AQ201 AQ202 AQ203 AQ204 AQ205 AQ206 AQ207 AQ208 AQ209 AQ210 AQ301 AQ302 AQ303 AQ304 AQ305 AQ306 AQ307 AQ308 AQ309 AQ310 AQ401 AQ402 AQ403 AQ404 AQ405 AQ406 AQ407 AQ408 AQ409 AQ410 AQ501 AQ502 AQ503 AQ504 AQ505 AQ506 AQ507 AQ508 AQ509 AQ510 AR101 AR102 AR103 AR104 AR105 AR106 AR107 AR108 AR109 AR110 AR201 AR202 AR203 AR204 AR205 AR206 AR207 AR208 AR209 AR210 AR301 AR302 AR303 AR304 AR305 AR306 AR307 AR308 AR309 AR310 AR401 AR402 AR403 AR404 AR405 AR406 AR407 AR408 AR409 AR410 AR501 AR502 AR503 AR504 AR505 AR506 AR507 AR508 AR509 AR510', 'symbol', 6, 64)
 
@@ -554,14 +582,14 @@ def main() -> int:
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))
                 continue
-            if kind == 'pose' and cid[:2] in ('AI', 'AJ', 'AV', 'AW', 'BB', 'BC', 'BI', 'BJ'):
+            if kind == 'pose' and cid[:2] in ('AI', 'AJ', 'AV', 'AW', 'BB', 'BC', 'BI', 'BJ', 'BP', 'BQ'):
                 # bronze age linen: only the bright cloth is tinted (grey anvils and stones stay)
-                head = {'AI3': 0.35, 'AJ2': 0.35, 'AJ4': 0.0, 'AW2': 0.0, 'AV3': 0.35, 'BB1': 0.35, 'BB4': 0.35, 'BC2': 0.0, 'BJ1': 0.0, 'BI2': 0.35, 'BI3': 0.35}.get(cid[:3], 0.28)
+                head = {'AI3': 0.35, 'AJ2': 0.35, 'AJ4': 0.0, 'AW2': 0.0, 'AV3': 0.35, 'BB1': 0.35, 'BB4': 0.35, 'BC2': 0.0, 'BJ1': 0.0, 'BI2': 0.35, 'BI3': 0.35, 'BQ1': 0.0, 'BQ2': 0.0, 'BQ4': 0.0}.get(cid[:3], 0.28)
                 base, cloth = split_cloth(img, head, 0.66)
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))
                 continue
-            if kind == 'person' and cid[:2] in ('AN', 'AO', 'AX', 'BD', 'BK'):
+            if kind == 'person' and cid[:2] in ('AN', 'AO', 'AX', 'BD', 'BK', 'BR'):
                 # guards: only the light tunic takes the clan colour, the grey wolf fur and the metal stay
                 base, cloth = split_fur(img, 0.3) if cid[:2] == 'AN' else split_cloth(img, 0.3, 0.72, 0.3)
                 items.append((name, base, 0.5, ay, s))

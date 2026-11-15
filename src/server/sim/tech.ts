@@ -235,12 +235,62 @@ export const TECHS: Tech[] = [
   { id: 'academy', name: 'Академия на науките', era: 5, target: 1700, prereq: ['university', 'printing', 'telescope'], need: null, base: 0.0012, gene: 'int',
     text: '{name} от {band} събра учените в академия. Те правят опити, мерят всичко точно и печатат откритията си, за да ги провери всеки.',
     kids: '{name} събра всички учени на едно място да правят опити!' },
+  // gateway to the Industrial age
+  { id: 'steam_engine', name: 'Парна машина', era: 6, target: 1765, prereq: ['academy', 'clock'], need: 'ore', base: 0.002, gene: 'int',
+    text: '{name} от {band} затвори вряща вода в железен котел и накара парата да бута бутало. Машината работи денем и нощем, без да се уморява. Започва нова епоха.',
+    kids: '{name} построи машина, която работи с пара от вряща вода!' },
+  { id: 'balloon', name: 'Балон', era: 6, target: 1783, prereq: ['fireworks', 'academy'], need: null, base: 0.0012, gene: 'cur',
+    text: '{name} от {band} напълни огромна платнена торба с горещ въздух. Балонът се издигна над покривите с двама смелчаци в кошницата и всички вдигнаха глави.',
+    kids: '{name} полетя с балон над града и махаше на всички отгоре!' },
+  { id: 'factory', name: 'Фабрика', era: 6, target: 1790, prereq: ['steam_engine', 'guilds', 'banking'], need: null, base: 0.0015, gene: 'soc',
+    text: '{name} от {band} сложи парна машина в голяма тухлена сграда и тя завъртя сто стана наведнъж. Платът и сечивата вече се правят бързо и евтино.',
+    kids: '{name} построи фабрика, където машините тъкат плат вместо хората!' },
+  { id: 'vaccine', name: 'Ваксина', era: 6, target: 1796, prereq: ['microscope', 'medicine'], need: null, base: 0.0015, gene: 'int',
+    text: '{name} от {band} забеляза, че доячките, прекарали кравешка шарка, не се разболяват от едра шарка. Една малка драскотина вече пази децата от страшната болест.',
+    kids: '{name} измисли ваксината: една малка драскотина пази децата от болест!' },
+  { id: 'steamship', name: 'Параход', era: 6, target: 1815, prereq: ['steam_engine', 'caravel'], need: 'fish', base: 0.0015, gene: 'cur',
+    text: '{name} от {band} сложи парна машина в кораб и тя завъртя две големи колела отстрани. Параходът плава и срещу вятъра, и в безветрие.',
+    kids: '{name} построи кораб, който плава без вятър, с пара и колела!' },
+  { id: 'railway', name: 'Железница', era: 6, target: 1825, prereq: ['steam_engine', 'post'], need: null, base: 0.0015, gene: 'str',
+    text: '{name} от {band} постави парна машина на колела върху железни релси. Влакът тегли десетки вагони и стига до съседния град за час.',
+    kids: '{name} построи влак, който пуфти по релсите и вози всички!' },
+  { id: 'photography', name: 'Фотография', era: 6, target: 1839, prereq: ['telescope', 'academy'], need: null, base: 0.0012, gene: 'cur',
+    text: '{name} от {band} насочи кутия със стъкло към площада и след малко на сребърна плочка остана точната му картина. Вече може да се пази как е изглеждал светът.',
+    kids: '{name} направи първата снимка: картина, нарисувана от светлината!' },
+  { id: 'telegraph', name: 'Телеграф', era: 6, target: 1840, prereq: ['newspaper', 'railway'], need: null, base: 0.0015, gene: 'soc',
+    text: '{name} от {band} опъна жица между два града и прати по нея кратки и дълги сигнали. Новината стига до другия край на царството за миг.',
+    kids: '{name} прати писмо по жица и то пристигна веднага!' },
+  { id: 'fertilizer', name: 'Изкуствен тор', era: 6, target: 1843, prereq: ['potato', 'academy'], need: 'grain', base: 0.0015, gene: 'int',
+    text: '{name} от {band} разбра кое хранят растенията и го даде на нивите. Една и съща земя вече ражда двойно повече.',
+    kids: '{name} измисли тор, от който нивите раждат двойно повече!' },
+  { id: 'sewer', name: 'Канализация', era: 6, target: 1860, prereq: ['aqueduct', 'microscope'], need: null, base: 0.0012, gene: 'str',
+    text: '{name} от {band} прокара под улиците тухлени тунели, които отнасят мръсната вода далеч от града. Болестите от мръсна вода почти изчезнаха.',
+    kids: '{name} построи тунели под града, които отнасят мръсната вода!' },
+  { id: 'school', name: 'Училище за всички', era: 6, target: 1870, prereq: ['newspaper', 'factory'], need: null, base: 0.0015, gene: 'soc',
+    text: '{name} от {band} убеди всички, че всяко дете трябва да ходи на училище. Вече почти всички в града могат да четат и смятат.',
+    kids: '{name} направи училище за всички деца. Вече всички могат да четат!' },
+  { id: 'electricity', name: 'Електричество', era: 6, target: 1880, prereq: ['telegraph', 'factory'], need: null, base: 0.0012, gene: 'int',
+    text: '{name} от {band} завъртя магнит в намотка жица и по нея потече ток. Стъклена крушка светна без пламък и нощта в града стана светла.',
+    kids: '{name} запали крушка без огън. Сега нощем в града е светло!' },
+  { id: 'automobile', name: 'Автомобил', era: 6, target: 1886, prereq: ['electricity', 'railway'], need: null, base: 0.0012, gene: 'cur',
+    text: '{name} от {band} сложи малък двигател на каруца без коне. Колата бръмчи по пътя и стига навсякъде, където няма релси.',
+    kids: '{name} направи каруца, която върви без коне!' },
+  { id: 'aviation', name: 'Самолет', era: 6, target: 1903, prereq: ['automobile', 'balloon'], need: null, base: 0.0012, gene: 'cur',
+    text: '{name} от {band} сложи двигател на крила от дърво и плат. Машината се отлепи от земята и полетя като птица.',
+    kids: '{name} полетя със самолет като птица!' },
+  { id: 'radio', name: 'Радио', era: 6, target: 1920, prereq: ['electricity', 'telegraph'], need: null, base: 0.0012, gene: 'soc',
+    text: '{name} от {band} прати глас и музика през въздуха, без жица. Във всеки дом кутия с говорител разказва новините и пее песни.',
+    kids: '{name} измисли радиото: в кутията пее музика от далеч!' },
+  { id: 'antibiotics', name: 'Антибиотици', era: 6, target: 1928, prereq: ['vaccine', 'microscope'], need: null, base: 0.0012, gene: 'cur',
+    text: '{name} от {band} забеляза, че синя плесен убива микробите около себе си. От нея направи лек, който спасява хора от рани и треска.',
+    kids: '{name} намери в плесента лек, който побеждава болестите!' },
 ];
 
 export const TECH_BY_ID = new Map(TECHS.map((t) => [t.id, t]));
 
 /** Era of a set of known techs: the highest era with a defining tech known. */
 export function eraOf(techs: Set<string>): number {
+  if (techs.has('steam_engine')) return 6;
   if (techs.has('caravel')) return 5;
   if (techs.has('heavy_plough')) return 4;
   if (techs.has('iron')) return 3;
