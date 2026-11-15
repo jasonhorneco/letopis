@@ -3,6 +3,7 @@ import {
 } from 'pixi.js';
 import { Simplex } from '../shared/noise';
 import { Fauna } from './animals';
+import { Fleet } from './ships';
 import { SECRET_KINDS, SecretSpot, secretSpots } from '../shared/secrets';
 import { B, VILLAGE } from './lang';
 import { Rng } from '../shared/rng';
@@ -227,6 +228,7 @@ export class WorldRenderer {
   lastPeople: { rows: PersonRow[]; bandColors: Map<number, number>; tickMs: number } | null = null;
   camps = new Map<number, CampSprite>();
   fauna = new Fauna(this);
+  fleet = new Fleet(this);
   /** the 100 hidden secrets: tiny, half see-through, buried by snow in winter */
   secrets: { spot: SecretSpot; s: Sprite; i: number; found: boolean }[] = [];
   tex!: Record<string, Texture>;
@@ -885,6 +887,7 @@ export class WorldRenderer {
     for (const [id, c] of this.camps) if (!seen.has(id)) { c.destroy(); this.camps.delete(id); }
     if (this.info) this.updateCleared();
     this.fauna.updateBands(bands);
+    this.fleet.updateBands(bands);
     this.updateRealms(bands);
   }
 
@@ -1217,6 +1220,7 @@ export class WorldRenderer {
       if (on) c.frame(nowMs, zoom);
     }
     this.fauna.frame(performance.now(), Math.min(0.1, dt / 60));
+    this.fleet.frame(performance.now(), Math.min(0.1, dt / 60));
     this.secretFrame(nowMs, zoom, winter);
   }
 }

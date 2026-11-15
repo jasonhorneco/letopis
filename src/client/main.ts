@@ -628,12 +628,16 @@ async function showTree(id: number) {
     const tail = a.match(L3(/ г\..*$/, / BC$/, / v\. Chr\.$/))?.[0] ?? '';
     return tail && b.endsWith(tail) ? `${a.slice(0, -tail.length)} – ${b}` : `${a} – ${b}`;
   };
+  // kings and queens wear a crown; a king's children are princes and princesses
+  const royal = (n: TreeNode) => n.royal === 'king' ? T('цар', 'king', 'König') : n.royal === 'queen' ? T('царица', 'queen', 'Königin')
+    : n.royal === 'heir' ? (n.sex ? T('принцеса', 'princess', 'Prinzessin') : T('принц', 'prince', 'Prinz')) : '';
+  const card = (n: TreeNode) => `<div class="tbox ${n.sex ? 'f' : 'm'}${n.diedYear !== null ? ' dead' : ''}${n.royal ? ' royal' : ''}" data-tree="${n.id}" title="${T('Покажи неговото родословие', 'Show their family tree', 'Stammbaum anzeigen')}">
+      <b>${n.royal === 'king' || n.royal === 'queen' ? '👑 ' : ''}${esc(P(n.name))}</b><small>${n.royal ? `${royal(n)} · ` : ''}${years(n)}</small></div>`;
   const box = (n: TreeNode | null | undefined, gen: number): string => {
     if (!n) return `<div class="tbox empty">${gen <= 1 ? T('от първите хора', 'one of the first people', 'aus der ersten Generation') : T('неизвестен', 'unknown', 'unbekannt')}</div>`;
     const parents = n.mother !== undefined || n.father !== undefined
       ? `<div class="tpar">${box(n.father, n.generation - 1)}${box(n.mother, n.generation - 1)}</div>` : '';
-    return `<div class="tn"><div class="tbox ${n.sex ? 'f' : 'm'}${n.diedYear !== null ? ' dead' : ''}" data-tree="${n.id}" title="${T('Покажи неговото родословие', 'Show their family tree', 'Stammbaum anzeigen')}">
-      <b>${esc(P(n.name))}</b><small>${years(n)}</small></div>${parents}</div>`;
+    return `<div class="tn">${card(n)}${parents}</div>`;
   };
   const line = (title: string, l: TreeNode[]) => l.length
     ? `<details class="tline"><summary>${title}: ${T(`${l.length} поколения назад, до`, `${l.length} generations back, to`, `${l.length} Generationen zurück:`)} ${esc(P(l[l.length - 1].name))}</summary><ol>${l.map((n) => `<li><a href="#" data-tree="${n.id}">${esc(P(n.name))}</a> <span class="muted">${years(n)}</span></li>`).join('')}</ol></details>`
@@ -643,6 +647,11 @@ async function showTree(id: number) {
     <h2>${T('Родословие', 'Family tree', 'Stammbaum')}</h2>
     <div class="muted"><a href="#" data-person="${root.id}">${esc(P(root.name))}</a> · ${T(`${root.generation}-о поколение · цъкни някого, за да видиш неговите предци`, `generation ${root.generation} · click someone to see their ancestors`, `${root.generation}. Generation · klicke auf jemanden, um seine Vorfahren zu sehen`)}</div>
     <div class="tree">${box(root, root.generation)}</div>
+    ${root.partner || root.children?.length ? `<h3>${T('Семейство', 'Family', 'Familie')}</h3><div class="tfam">
+      ${root.partner ? `<div class="trow"><span class="muted">${T(root.sex ? 'Съпруг' : 'Съпруга', root.sex ? 'Husband' : 'Wife', root.sex ? 'Ehemann' : 'Ehefrau')}</span>${card(root.partner)}</div>` : ''}
+      ${(root.children ?? []).map((c) => `<div class="trow"><span class="muted">${T(c.sex ? 'Дъщеря' : 'Син', c.sex ? 'Daughter' : 'Son', c.sex ? 'Tochter' : 'Sohn')}</span>${card(c)}${c.children?.length
+        ? `<div class="tkids">${c.children.map((g) => `<a href="#" data-tree="${g.id}">${esc(P(g.name))}</a>`).join(', ')}</div>` : ''}</div>`).join('')}
+    </div>` : ''}
     ${line(T('По майчина линия', 'Mother\'s line', 'Mütterliche Linie'), t.motherLine)}
     ${line(T('По бащина линия', 'Father\'s line', 'Väterliche Linie'), t.fatherLine)}`, false, 'wide');
 }
@@ -672,7 +681,9 @@ function kingdomsHtml(): string {
         <div class="muted">${T('от', 'since', 'seit')} ${fmtYear(k.founded)} · ${m.length} ${T(m.length === 1 ? 'село' : 'села', m.length === 1 ? 'village' : 'villages', m.length === 1 ? 'Dorf' : 'Dörfer')} · ${people} ${T('души', 'people', 'Menschen')}</div>
         <div>${T('Цар', 'King', 'König')}: ${king} · ${T('Столица', 'Capital', 'Hauptstadt')}: ${town(cap)}</div>
         ${others.length ? `<div class="muted">${others.map(town).join(', ')}</div>` : ''}
-        ${k.allies?.length ? `<div>🤝 ${T('Съюзници', 'Allies', 'Verbündete')}: ${k.allies.map((x) => esc(VILLAGE(x))).join(', ')}</div>` : ''}</div></li>`;
+        ${k.allies?.length ? `<div>🤝 ${T('Съюзници', 'Allies', 'Verbündete')}: ${k.allies.map((x) => esc(VILLAGE(x))).join(', ')}</div>` : ''}
+        ${(k.kings?.length ?? 0) > 1 ? `<details class="kings"><summary>${T(`Царе (${k.kings!.length})`, `Kings (${k.kings!.length})`, `Könige (${k.kings!.length})`)}</summary><ol>${k.kings!.map((x) =>
+          `<li><a href="#" data-tree="${x.id}">${esc(P(x.name))}</a> <span class="muted">${fmtYear(x.from)}${x.to !== null ? ` – ${fmtYear(x.to)}` : ''}</span></li>`).join('')}</ol></details>` : ''}</div></li>`;
     }).join('')}</ul>`;
 }
 

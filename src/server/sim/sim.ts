@@ -100,6 +100,8 @@ export interface Kingdom {
   founded: number; // year
   /** royal weddings: ally kingdom id -> the year they became allies (from v1.40) */
   allies?: Record<number, number>;
+  /** every king the realm had, first to last (from v1.41) */
+  kings?: { id: number; name: string; from: number; to?: number }[];
 }
 
 /** Everything in here is saved to disk. */
@@ -139,6 +141,8 @@ export interface SimState {
   roadPairs?: string[];
   /** iron age kingdoms (from v1.35) */
   kingdoms?: Kingdom[];
+  /** everyone who ever wore a crown (from v1.41) */
+  kingIds?: number[];
   nextKingdomId?: number;
 }
 
@@ -332,7 +336,8 @@ export class Simulation {
     const k = this.kingdomOf(b);
     if (!k) return null;
     const allies = Object.keys(k.allies ?? {}).map((id) => this.s.kingdoms?.find((o) => o.id === +id)?.place).filter((x): x is string => !!x);
-    return { id: k.id, place: k.place, capital: k.capital === b.id, members: k.members.length, color: this.bandById.get(k.capital)?.color ?? b.color, founded: k.founded, allies };
+    const kings = k.capital === b.id ? (k.kings ?? []).map((x) => ({ id: x.id, name: x.name, from: x.from, to: x.to ?? null })) : undefined;
+    return { id: k.id, place: k.place, capital: k.capital === b.id, members: k.members.length, color: this.bandById.get(k.capital)?.color ?? b.color, founded: k.founded, allies, kings };
   }
 
   /** 'царство Бялово' in a sentence, 'Царство Бялово' at its start */
@@ -384,6 +389,7 @@ export class Simulation {
       const k: Kingdom = { id: (this.s.nextKingdomId = (this.s.nextKingdomId ?? 0) + 1), place: b.settlementName ?? b.name, capital: b.id, members: [b.id], founded: Math.floor(this.year) };
       ks.push(k);
       b.kingdom = k.id;
+      this.recordKing(k);
       const king = b.chiefId ? this.byId.get(b.chiefId) : undefined;
       if (king) king.deeds.push(`Стана първият цар на ${this.kBg(k)} (${formatYear(this.year)})`);
       this.emit('kingdom', 2, `${this.bandLabel(b, true)} стана столица на ${this.kBg(k)}.${king ? ` ${this.nameOf(king)} е първият му цар.` : ''}`,
@@ -402,8 +408,35 @@ export class Simulation {
         this.joinKingdom(k, o);
       }
     }
+    for (const k of ks) this.recordKing(k);
     this.royalWeddings(ks);
     this.unions(ks);
+  }
+
+  /** the chief of the capital is the king: a new one is written in the list of kings */
+  private recordKing(k: Kingdom) {
+    const cap = this.bandById.get(k.capital);
+    const id = cap?.chiefId;
+    const list = (k.kings ??= []);
+    const last = list[list.length - 1];
+    if (!id || last?.id === id) return;
+    const p = this.byId.get(id);
+    if (!p) return;
+    const y = Math.floor(this.year);
+    if (last && last.to == null) last.to = y;
+    list.push({ id, name: this.nameOf(p), from: y });
+    const all = (this.s.kingIds ??= []);
+    if (!all.includes(id)) all.push(id);
+  }
+
+  /** king, queen (a king's wife), prince or princess (a king's child), for the family tree */
+  private royalOf(id: number, motherId: number | null, fatherId: number | null, partnerId: number | null): TreeNode['royal'] {
+    const kings = this.s.kingIds;
+    if (!kings?.length) return undefined;
+    if (kings.includes(id)) return 'king';
+    if (partnerId && kings.includes(partnerId)) return 'queen';
+    if ((fatherId && kings.includes(fatherId)) || (motherId && kings.includes(motherId))) return 'heir';
+    return undefined;
   }
 
   /** the king's children and grandchildren */
@@ -1506,10 +1539,21 @@ export class Simulation {
   /** the band's head: the oldest man; a new one when he dies or leaves */
   private ensureChief(b: Band, m: Person[]): Person | null {
     const cur = b.chiefId ? this.byId.get(b.chiefId) : undefined;
-    if (cur && cur.bandId === b.id && this.ageOf(cur) < 70) return cur;
+    // a king reigns for life; other chiefs hand over at 70
+    const capital = this.isCapital(b);
+    if (cur && cur.bandId === b.id && (this.ageOf(cur) < 70 || capital)) return cur;
     // at 70 the old chief stays by the fire with the children and hands over to the oldest man after him
     let best: Person | null = null;
-    for (const p of m) if (p.sex === 0 && this.ageOf(p) >= 16 && this.ageOf(p) < 70 && (!best || p.born < best.born)) best = p;
+    // in a capital the crown goes to the king's eldest son, then his eldest grandson, then anyone of royal blood
+    if (capital && b.chiefId) {
+      const oldId = b.chiefId;
+      const men = m.filter((p) => p.sex === 0 && this.ageOf(p) >= 16).sort((x, y) => x.born - y.born);
+      const kings = this.s.kingIds ?? [];
+      best = men.find((p) => p.fatherId === oldId)
+        ?? men.find((p) => p.fatherId != null && this.byId.get(p.fatherId)?.fatherId === oldId)
+        ?? men.find((p) => p.fatherId != null && kings.includes(p.fatherId) && this.ageOf(p) < 70) ?? null;
+    }
+    if (!best) for (const p of m) if (p.sex === 0 && this.ageOf(p) >= 16 && this.ageOf(p) < 70 && (!best || p.born < best.born)) best = p;
     const had = !!b.chiefId;
     b.chiefId = best?.id ?? null;
     if (!best) { b.scout = null; return null; }
@@ -1975,13 +2019,25 @@ export class Simulation {
   }
 
   /** a person alive or dead, with the ids of the parents */
-  private kin(id: number | null): (TreeNode & { motherId: number | null; fatherId: number | null }) | null {
+  private kin(id: number | null): (TreeNode & { motherId: number | null; fatherId: number | null; partnerId: number | null; kids: number[] }) | null {
     if (!id) return null;
     const p = this.byId.get(id);
-    if (p) return { id, name: this.nameOf(p), sex: p.sex, bornYear: Math.floor(yearOf(p.born)), diedYear: null, generation: p.gen, motherId: p.motherId, fatherId: p.fatherId };
+    if (p) {
+      return { id, name: this.nameOf(p), sex: p.sex, bornYear: Math.floor(yearOf(p.born)), diedYear: null, generation: p.gen, motherId: p.motherId, fatherId: p.fatherId,
+        partnerId: p.partnerId, kids: p.children, royal: this.royalOf(id, p.motherId, p.fatherId, p.partnerId) };
+    }
     const d = this.lookupDead(id);
     if (!d) return null;
-    return { id, name: d.name, sex: d.sex, bornYear: Math.floor(yearOf(d.born)), diedYear: Math.floor(yearOf(d.died)), generation: d.gen, motherId: d.motherId, fatherId: d.fatherId };
+    return { id, name: d.name, sex: d.sex, bornYear: Math.floor(yearOf(d.born)), diedYear: Math.floor(yearOf(d.died)), generation: d.gen, motherId: d.motherId, fatherId: d.fatherId,
+      partnerId: d.partnerId, kids: d.children ?? [], royal: this.royalOf(id, d.motherId, d.fatherId, d.partnerId) };
+  }
+
+  /** a node without the ids used to walk the tree */
+  private node(nid: number | null): TreeNode | null {
+    const k = this.kin(nid);
+    if (!k) return null;
+    const { motherId: _m, fatherId: _f, partnerId: _p, kids: _k, ...node } = k;
+    return node;
   }
 
   /** ancestors `depth` generations up, plus the straight mother and father lines back to the first people */
@@ -1989,19 +2045,29 @@ export class Simulation {
     const up = (nid: number | null, left: number): TreeNode | null => {
       const k = this.kin(nid);
       if (!k) return null;
-      const { motherId, fatherId, ...node } = k;
+      const { motherId, fatherId, partnerId: _p, kids: _k, ...node } = k;
       if (left > 0) { node.mother = up(motherId, left - 1); node.father = up(fatherId, left - 1); }
       return node;
     };
     const root = up(id, depth);
     if (!root) return null;
+    // downwards: the partner, the children and their children
+    const me = this.kin(id)!;
+    root.partner = this.node(me.partnerId);
+    root.children = me.kids.slice(0, 16).map((c) => {
+      const kc = this.kin(c);
+      if (!kc) return null;
+      const n = this.node(c)!;
+      n.children = kc.kids.slice(0, 12).map((g) => this.node(g)).filter((x): x is TreeNode => !!x);
+      return n;
+    }).filter((x): x is TreeNode => !!x);
     const line = (side: 'motherId' | 'fatherId'): TreeNode[] => {
       const out: TreeNode[] = [];
       let k = this.kin(id);
       for (let n = 0; k && n < 5000; n++) {
         k = this.kin(k[side]);
         if (!k) break;
-        const { motherId: _m, fatherId: _f, ...node } = k;
+        const { motherId: _m, fatherId: _f, partnerId: _p, kids: _k, ...node } = k;
         out.push(node);
       }
       return out;
