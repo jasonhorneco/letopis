@@ -371,6 +371,34 @@ group('paperboy', cells('BQ', (3,)), 'pose', PEOPLE_WPP, 0)
 group('lady', cells('BQ', (4,)), 'pose', PEOPLE_WPP, 0)
 group('wgwalk', cells('BR', (1, 2)), 'person', 13.6, 64)
 group('wgidle', cells('BR', (3, 4)), 'person', 13.6, 64)
+# information age (CE props, CF skyscraper/airport/plants, CG town, CH cars, buses, planes, CI workers, CJ travellers, CK patrol officer)
+for cid, name, w in (('CE11', 'satdish', 0.05), ('CE12', 'pcdesk', 0.055), ('CE13', 'tvset', 0.05), ('CE14', 'phonebox', 0.045),
+                     ('CE21', 'solarpanel', 0.06), ('CE22', 'charger', 0.045), ('CE23', 'trafficlight', 0.045), ('CE24', 'busstop', 0.06),
+                     ('CE31', 'playground', 0.07), ('CE32', 'recycling', 0.055), ('CE33', 'postbox', 0.04), ('CE34', 'parkbench2', 0.055),
+                     ('CE41', 'windturbine', 0.06), ('CE42', 'vending', 0.045), ('CE43', 'kiosk', 0.06), ('CE44', 'scooter', 0.05),
+                     ('CF31', 'nuclear', 0.1), ('CF32', 'tvtower', 0.07), ('CF33', 'solarfarm', 0.09), ('CF34', 'radioscope', 0.08),
+                     ('CF41', 'mrail', 0.07), ('CF42', 'mrailcurve', 0.07), ('CF43', 'msignal', 0.045), ('CF44', 'launchpad', 0.08),
+                     ('CG21', 'house2', 0.085), ('CG22', 'school2', 0.095), ('CG23', 'hospital2', 0.095), ('CG24', 'supermarket', 0.095),
+                     ('CG31', 'cinema', 0.09), ('CG32', 'stadium', 0.1), ('CG33', 'library', 0.09), ('CG34', 'office', 0.09),
+                     ('CG41', 'firestation2', 0.09), ('CG42', 'petrol', 0.09), ('CG43', 'cafe2', 0.085), ('CG44', 'park', 0.09),
+                     ('CH41', 'etrain', 0.08), ('CH42', 'containership', 0.1), ('CH43', 'helicopter', 0.06), ('CH44', 'truck', 0.065)):
+    group(name, cid, 'thing', w, 0)
+group('skyscraperb', cells('CF', (1,)), 'thing', 0.1, 0)   # 0..3: glass skyscraper
+group('airportb', cells('CF', (2,)), 'thing', 0.12, 0)     # 0..3: airport with tower
+group('blockb', cells('CG', (1,)), 'thing', 0.09, 0)       # 0..3: apartment block
+group('car', cells('CH', (1,)), 'thing', 0.055, 0)         # 4 frames
+group('bus', cells('CH', (2,)), 'thing', 0.075, 0)         # 4 frames
+group('plane', cells('CH', (3,)), 'thing', 0.09, 0)        # 4 frames
+group('programmer', cells('CI', (1,)), 'pose', PEOPLE_WPP, 0)
+group('scientist', cells('CI', (2,)), 'pose', PEOPLE_WPP, 0)
+group('builder', cells('CI', (3,)), 'pose', PEOPLE_WPP, 0)
+group('doctor', cells('CI', (4,)), 'pose', PEOPLE_WPP, 0)
+group('jogger', cells('CJ', (1,)), 'pose', PEOPLE_WPP, 0)
+group('phonewalk', cells('CJ', (2,)), 'pose', PEOPLE_WPP, 0)
+group('kickscooter', cells('CJ', (3,)), 'pose', PEOPLE_WPP, 0)
+group('courier', cells('CJ', (4,)), 'pose', PEOPLE_WPP, 0)
+group('ogwalk', cells('CK', (1, 2)), 'person', 13.6, 64)
+group('ogidle', cells('CK', (3, 4)), 'person', 13.6, 64)
 # everyday clothes of each age (sheets BS-CD, two per age: adults, then children and more poses); prefix e<era>
 for pre, a, b in (('e2', 'BS', 'BT'), ('e4', 'BU', 'BV'), ('e5', 'BW', 'BX'), ('e6', 'BY', 'BZ'), ('e7', 'CA', 'CB'), ('e8', 'CC', 'CD')):
     group(pre + 'walk', cells(a, (1,)), 'person', 11, 64)
@@ -434,14 +462,15 @@ def top_only(img: Image.Image, cy: float) -> Image.Image:
     return Image.fromarray(out.astype(np.uint8))
 
 
-def split_cloth(img: Image.Image, head: float, bright: float = 0.45, satmax: float = 0.2) -> tuple[Image.Image, Image.Image]:
-    """Light grey/white cloth -> separate grey layer; the rest stays in the base."""
+def split_cloth(img: Image.Image, head: float, bright: float = 0.45, satmax: float = 0.2, upto: float = 1.0) -> tuple[Image.Image, Image.Image]:
+    """Light grey/white cloth -> separate grey layer; the rest stays in the base. Only rows from head to upto (share of the height)."""
     a = np.array(img).astype(np.float32)
     rgb = a[..., :3] / 255
     mx, mn = rgb.max(-1), rgb.min(-1)
     sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0)
     cloth = (sat < satmax) & (mx > bright) & (a[..., 3] > 0)
     cloth[: int(a.shape[0] * head)] = False
+    cloth[int(a.shape[0] * upto):] = False
     base = a.copy()
     base[cloth, 3] = 0
     c = np.zeros_like(a)
@@ -595,20 +624,26 @@ def main() -> int:
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))
                 continue
-            if kind == 'pose' and cid[:2] in ('AI', 'AJ', 'AV', 'AW', 'BB', 'BC', 'BI', 'BJ', 'BP', 'BQ'):
+            if kind == 'pose' and cid[:2] in ('AI', 'AJ', 'AV', 'AW', 'BB', 'BC', 'BI', 'BJ', 'BP', 'BQ', 'CI', 'CJ'):
                 # bronze age linen: only the bright cloth is tinted (grey anvils and stones stay)
                 head = {'AI3': 0.35, 'AJ2': 0.35, 'AJ4': 0.0, 'AW2': 0.0, 'AV3': 0.35, 'BB1': 0.35, 'BB4': 0.35, 'BC2': 0.0, 'BJ1': 0.0, 'BI2': 0.35, 'BI3': 0.35, 'BQ1': 0.0, 'BQ2': 0.0, 'BQ4': 0.0}.get(cid[:3], 0.28)
                 base, cloth = split_cloth(img, head, 0.66)
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))
                 continue
-            if kind == 'person' and cid[:2] in ('AN', 'AO', 'AX', 'BD', 'BK', 'BR'):
+            if kind == 'person' and cid[:2] in ('AN', 'AO', 'AX', 'BD', 'BK', 'BR', 'CK'):
                 # guards: only the light tunic takes the clan colour, the grey wolf fur and the metal stay
                 base, cloth = split_fur(img, 0.3) if cid[:2] == 'AN' else split_cloth(img, 0.3, 0.72, 0.3)
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))
                 continue
-            if kind in ('person', 'cloth'):
+            if kind == 'person' and cid[:2] in ('CA', 'CB', 'CC', 'CD'):
+                # today and the future: white clothes stay white, only the collar takes the clan colour
+                kid = cid[:2] in ('CB', 'CD') and cid[2] in '123'
+                base, cloth = split_cloth(img, 0.36 if kid else 0.25, upto=0.47 if kid else 0.36)
+                items.append((name, base, 0.5, ay, s))
+                items.append((name + '_c', cloth, 0.5, ay, s))
+            elif kind in ('person', 'cloth'):
                 base, cloth = split_cloth(img, head=0.48 if cid == 'I13' else 1.0 if (cid[0] in 'STUV' and cid[1].isdigit()) else 0.3 if kind == 'person' else 0)
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))

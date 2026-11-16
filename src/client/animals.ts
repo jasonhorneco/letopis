@@ -90,6 +90,9 @@ const TAME: { sp: Species; tech?: string; settled?: boolean; from?: number; n: [
   { sp: { id: 'donkey', ...walk('donkey'), how: 'walk', biomes: [], group: [1, 1], speed: 0.4, weight: 1 }, tech: 'agriculture', from: -4000, n: [0, 1] },
 ];
 
+/** farm animals: a town of the information age keeps them on the farms, not in its streets */
+const FARM = new Set(['goat', 'sheep', 'cow', 'pig', 'hen', 'horse', 'donkey']);
+
 class Animal {
   c = new Container();
   s = new Sprite();
@@ -255,7 +258,7 @@ export class Fauna {
     for (const b of bands) {
       seen.add(b.id);
       const techs = new Set(b.techIds);
-      const want = TAME.filter((t) => (!t.tech || techs.has(t.tech)) && (!t.settled || b.settled) && (t.from === undefined || this.year >= t.from));
+      const want = TAME.filter((t) => (!t.tech || techs.has(t.tech)) && !(FARM.has(t.sp.id) && techs.has('computer') && b.settled) && (!t.settled || b.settled) && (t.from === undefined || this.year >= t.from));
       const key = want.map((t) => t.sp.id).join(',');
       let list = this.tame.get(b.id);
       if (!list || this.bandKey.get(b.id) !== key) {

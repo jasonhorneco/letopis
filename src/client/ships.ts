@@ -11,6 +11,7 @@ interface Ship { s: Sprite; path: [number, number][]; t: number; speed: number; 
 
 /** the best ship a town can build, and how many animation frames its sprite has */
 function shipOf(techs: Set<string>): [string, number] | null {
+  if (techs.has('computer')) return Math.random() < 0.5 ? ['containership', 1] : ['steamer', 4];
   if (techs.has('steamship')) return Math.random() < 0.6 ? ['steamer', 4] : ['galleon', 4];
   if (techs.has('caravel')) return Math.random() < 0.6 ? ['galleon', 4] : ['caravel', 4];
   if (techs.has('compass')) return ['cog', 1];
@@ -132,7 +133,8 @@ export class Fleet {
       sh.s.position.set(p.x, p.y + Math.sin(now / 600 + sh.seed) * 0.6);
       if (sh.frames > 1) this.r.atlas.set(sh.s, `${sh.kind}${Math.floor(now / 400 + sh.seed) % sh.frames}`);
       // the sprites face south-east; going west on screen the ship turns round
-      const west = iso(x1, y1).x < iso(x0, y0).x;
+      // (the container ship is drawn facing south-west)
+      const west = (iso(x1, y1).x < iso(x0, y0).x) !== (sh.kind === 'containership');
       sh.s.scale.x = Math.abs(sh.s.scale.x) * (west ? -1 : 1);
       // a ship fades in as it leaves and out as it arrives
       const left = sh.path.length - 1 - sh.t;
