@@ -1365,7 +1365,8 @@ export class PersonSprite {
     if (this.star) this.star.position.set(3.2, -Math.abs(this.body.height) - 1.5);
   }
 
-  private setPose(name: string) {
+  private setPose(raw: string) {
+    const name = this.dress(raw);
     if (name === this.pose) return;
     this.pose = name;
     this.r.atlas.set(this.body, name);
@@ -1405,6 +1406,29 @@ export class PersonSprite {
       sp.tint = 0xff2a2a;
       sp.position.set(Math.cos(a) * d, Math.sin(a) * d);
     });
+  }
+
+  private dressT: Set<string> | undefined;
+  private dressN = -1;
+  private dressP = '';
+  /** everyday clothes of the band's age: the same pose from the sheets of that age (BS-CD), when there is one */
+  private dress(name: string): string {
+    const t = this.r.bandTech.get(this.band);
+    if (t !== this.dressT || (t?.size ?? 0) !== this.dressN) {
+      this.dressT = t;
+      this.dressN = t?.size ?? 0;
+      this.dressP = !t ? '' : t.has('moon_base') ? 'e8' : t.has('computer') ? 'e7' : t.has('steam_engine') ? 'e6' : t.has('caravel') ? 'e5'
+        : t.has('heavy_plough') ? 'e4' : t.has('bronze') ? 'e2' : '';
+    }
+    if (!this.dressP) return name;
+    const m = /^([a-z0-9]+?)(\d*)$/.exec(name);
+    if (!m) return name;
+    // from the early modern age on nobody hunts or fishes with a spear in town any more: they just stand there
+    const late = this.dressP >= 'e5' ? LATE_DRESS[m[1]] : undefined;
+    const base = late ?? DRESS[m[1]];
+    if (!base) return name;
+    const dressed = `${this.dressP}${base}${late ? '' : m[2]}`;
+    return this.r.atlas.has(dressed) ? dressed : name;
   }
 
   /** a stable pick per person, so the pose does not flicker */
@@ -1633,6 +1657,17 @@ export class PersonSprite {
     this.c.destroy({ children: true });
   }
 }
+
+/** stone age pose -> the pose with the same meaning on the sheets with the clothes of each age */
+const DRESS: Record<string, string> = {
+  walk: 'walk', womanwalk: 'womanwalk', oldwalk: 'oldwalk', boywalk: 'boywalk', girlwalk: 'girlwalk',
+  man: 'man', woman: 'woman', elder: 'elder', wave: 'wave', hunter: 'man', potter: 'woman2', spinner: 'woman2', waterjar: 'woman',
+  gatherer: 'gatherer', reedcarrier: 'gatherer', carrier: 'carrier', woman2: 'woman2',
+  oldwoman: 'oldwoman', oldherbs: 'oldwoman', oldscarf: 'oldwoman', oldbasket: 'oldwoman',
+  boy: 'boy', girl: 'girl', kidwave: 'kidwave', kidtoy: 'kidtoy', kidberries: 'girl', kidpuppy: 'kidwave', kidstick: 'kidtoy', kidfish: 'boy',
+};
+/** stone age work with spears and flint, shown as a dressed pose from the early modern age on */
+const LATE_DRESS: Record<string, string> = { throw: 'man', spearfish: 'carrier', pick: 'gatherer', knap: 'man' };
 
 // Props a band shows in its camp once it knows the matching technology.
 const PROPS: [string, string, boolean | null][] = [

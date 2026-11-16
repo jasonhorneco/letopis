@@ -371,6 +371,19 @@ group('paperboy', cells('BQ', (3,)), 'pose', PEOPLE_WPP, 0)
 group('lady', cells('BQ', (4,)), 'pose', PEOPLE_WPP, 0)
 group('wgwalk', cells('BR', (1, 2)), 'person', 13.6, 64)
 group('wgidle', cells('BR', (3, 4)), 'person', 13.6, 64)
+# everyday clothes of each age (sheets BS-CD, two per age: adults, then children and more poses); prefix e<era>
+for pre, a, b in (('e2', 'BS', 'BT'), ('e4', 'BU', 'BV'), ('e5', 'BW', 'BX'), ('e6', 'BY', 'BZ'), ('e7', 'CA', 'CB'), ('e8', 'CC', 'CD')):
+    group(pre + 'walk', cells(a, (1,)), 'person', 11, 64)
+    group(pre + 'womanwalk', cells(a, (2,)), 'person', 11, 64)
+    group(pre + 'oldwalk', cells(a, (3,)), 'person', 10.5, 64)
+    for c, nm in enumerate(('man', 'woman', 'elder', 'wave'), 1):
+        group(pre + nm, f'{a}4{c}', 'person', 11, 64)
+    group(pre + 'boywalk', cells(b, (1,)), 'person', 8, 56)
+    group(pre + 'girlwalk', cells(b, (2,)), 'person', 8, 56)
+    for c, nm in enumerate(('boy', 'girl', 'kidwave', 'kidtoy'), 1):
+        group(pre + nm, f'{b}3{c}', 'person', 8, 56)
+    for c, nm, w in ((1, 'gatherer', 11), (2, 'carrier', 11), (3, 'oldwoman', 10.5), (4, 'woman2', 11)):
+        group(pre + nm, f'{b}4{c}', 'person', w, 64)
 # band symbols (white, tinted in game), same order as SYMBOLS in render.ts
 group('sym', 'AQ101 AQ102 AQ103 AQ104 AQ105 AQ106 AQ107 AQ108 AQ109 AQ110 AQ201 AQ202 AQ203 AQ204 AQ205 AQ206 AQ207 AQ208 AQ209 AQ210 AQ301 AQ302 AQ303 AQ304 AQ305 AQ306 AQ307 AQ308 AQ309 AQ310 AQ401 AQ402 AQ403 AQ404 AQ405 AQ406 AQ407 AQ408 AQ409 AQ410 AQ501 AQ502 AQ503 AQ504 AQ505 AQ506 AQ507 AQ508 AQ509 AQ510 AR101 AR102 AR103 AR104 AR105 AR106 AR107 AR108 AR109 AR110 AR201 AR202 AR203 AR204 AR205 AR206 AR207 AR208 AR209 AR210 AR301 AR302 AR303 AR304 AR305 AR306 AR307 AR308 AR309 AR310 AR401 AR402 AR403 AR404 AR405 AR406 AR407 AR408 AR409 AR410 AR501 AR502 AR503 AR504 AR505 AR506 AR507 AR508 AR509 AR510', 'symbol', 6, 64)
 
