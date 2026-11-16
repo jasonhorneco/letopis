@@ -3,6 +3,8 @@ import {
 } from 'pixi.js';
 import { Simplex } from '../shared/noise';
 import { Fauna } from './animals';
+import { Fleet } from './ships';
+import { Trains } from './trains';
 import { SECRET_KINDS, SecretSpot, secretSpots } from '../shared/secrets';
 import { B, VILLAGE } from './lang';
 import { Rng } from '../shared/rng';
@@ -180,6 +182,9 @@ export class WorldRenderer {
   roadLayer = new Container();
   roads = new Uint8Array(0);
   roadSprites = new Map<number, Sprite>();
+  /** railway tracks, over the roads and the snow */
+  railLayer = new Container();
+  railSprites = new Map<number, Sprite>();
   roadVersion = 0;
   /** what every band knows (tech ids), for the work people show */
   bandTech = new Map<number, Set<string>>();
@@ -227,6 +232,8 @@ export class WorldRenderer {
   lastPeople: { rows: PersonRow[]; bandColors: Map<number, number>; tickMs: number } | null = null;
   camps = new Map<number, CampSprite>();
   fauna = new Fauna(this);
+  fleet = new Fleet(this);
+  trains = new Trains(this);
   /** the 100 hidden secrets: tiny, half see-through, buried by snow in winter */
   secrets: { spot: SecretSpot; s: Sprite; i: number; found: boolean }[] = [];
   tex!: Record<string, Texture>;
@@ -280,6 +287,35 @@ export class WorldRenderer {
         for (let i = 10; i > 0; i--) x.circle(40, 40, i * 4).fill({ color: 0xff8a2a, alpha: 0.035 });
       }),
     };
+    // railway tracks, one texture for every way the neighbours can join (same mask as the roads)
+    for (let mask = 0; mask < 16; mask++) {
+      const gr = new Graphics();
+      // to the middle of the edge towards -x, -y, +x, +y
+      const dirs: [number, number, number][] = [[1, -8, -4], [2, 8, -4], [4, 8, 4], [8, -8, 4]];
+      let ends = dirs.filter(([m]) => mask & m);
+      if (!ends.length) ends = dirs.filter(([m]) => m & 10);
+      else if (ends.length === 1) ends = dirs.filter(([m]) => m === ends[0][0] || m === ((ends[0][0] << 2) | (ends[0][0] >> 2)) % 16);
+      for (const [, ex, ey] of ends) {
+        gr.moveTo(0, 0).lineTo(ex, ey).stroke({ width: 4.2, color: 0x7d7264, cap: 'round' });
+      }
+      for (const [, ex, ey] of ends) {
+        // sleepers lie across the track: the other axis, a little shorter
+        const px = -ex, py = ey;
+        const k = 0.28;
+        for (const t of [0.2, 0.55, 0.9]) {
+          const cx = ex * t, cy = ey * t;
+          gr.moveTo(cx - px * k, cy - py * k).lineTo(cx + px * k, cy + py * k).stroke({ width: 1.1, color: 0x6b4a2b });
+        }
+      }
+      for (const side of [-0.17, 0.17]) {
+        for (const [, ex, ey] of ends) {
+          const px = -ex * side, py = ey * side;
+          gr.moveTo(px, py).lineTo(ex + px, ey + py).stroke({ width: 0.7, color: 0xb9c0c6 });
+        }
+      }
+      this.tex[`rail${mask}`] = r.generateTexture({ target: gr, resolution: 3, frame: new Rectangle(-16, -8, 32, 16) });
+      gr.destroy();
+    }
   }
 
   setWorld(info: WorldInfo) {
@@ -309,6 +345,11 @@ export class WorldRenderer {
     this.roadSprites.clear();
     this.roadLayer = new Container();
     this.terrainLayer.addChild(this.roadLayer);
+    this.railSprites.clear();
+    this.railLayer.destroy({ children: true });
+    // the tracks are kept clear of snow, so they lie over it
+    this.railLayer = new Container();
+    this.snowLayer.addChild(this.railLayer);
     this.setupWaterFilter();
   }
 
@@ -581,21 +622,50 @@ export class WorldRenderer {
       if (y > 0) redo.add(i - w);
       if (y < h - 1) redo.add(i + w);
     }
-    for (const i of redo) this.drawRoad(i);
+    for (const i of redo) { this.drawRoad(i); this.drawRail(i); }
     // bushes and stones do not stand on a road
     for (const list of this.objChunks.values()) for (const o of list) if (o.kind === 'other' && !o.isStump && this.roads[o.i]) o.s.visible = false;
     // keep the road sprites in drawing order (back to front)
     this.roadLayer.children.sort((a, b) => a.y - b.y);
+    this.railLayer.children.sort((a, b) => a.y - b.y);
     this.roadVersion++;
+  }
+
+  /** is there a road (dirt or paved) on this tile */
+  isRoad(x: number, y: number): boolean {
+    const { w, h } = this.info;
+    return x >= 0 && y >= 0 && x < w && y < h && (this.roads[y * w + x] & 3) > 0;
+  }
+
+  /** is there a railway on this tile */
+  isRail(x: number, y: number): boolean {
+    const { w, h } = this.info;
+    return x >= 0 && y >= 0 && x < w && y < h && (this.roads[y * w + x] & 4) > 0;
+  }
+
+  private drawRail(i: number) {
+    const { w } = this.info;
+    const old = this.railSprites.get(i);
+    if (!(this.roads[i] & 4)) { if (old) { old.destroy(); this.railSprites.delete(i); } return; }
+    const x = i % w, y = (i - x) / w;
+    const mask = (this.isRail(x - 1, y) ? 1 : 0) | (this.isRail(x, y - 1) ? 2 : 0) | (this.isRail(x + 1, y) ? 4 : 0) | (this.isRail(x, y + 1) ? 8 : 0);
+    const tex = this.tex[`rail${mask}`];
+    if (!tex) return;
+    const s = old ?? new Sprite(tex);
+    s.texture = tex;
+    s.anchor.set(0.5);
+    const p = this.tileTop(x, y);
+    s.position.set(p.x, p.y);
+    if (!old) { this.railLayer.addChild(s); this.railSprites.set(i, s); }
   }
 
   private drawRoad(i: number) {
     const { w } = this.info;
-    const lvl = this.roads[i];
+    const lvl = this.roads[i] & 3;
     const old = this.roadSprites.get(i);
     if (!lvl) { if (old) { old.destroy(); this.roadSprites.delete(i); } return; }
     const x = i % w, y = (i - x) / w;
-    const has = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < w && yy < this.info.h && this.roads[yy * w + xx] > 0;
+    const has = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < w && yy < this.info.h && (this.roads[yy * w + xx] & 3) > 0;
     // 1 upper-left (-x), 2 upper-right (-y), 4 lower-right (+x), 8 lower-left (+y)
     const mask = (has(x - 1, y) ? 1 : 0) | (has(x, y - 1) ? 2 : 0) | (has(x + 1, y) ? 4 : 0) | (has(x, y + 1) ? 8 : 0);
     let name = `road${lvl}_${mask || 5}`;
@@ -688,7 +758,7 @@ export class WorldRenderer {
     const { w, h } = this.info;
     const next = new Set<number>();
     for (const c of this.camps.values()) {
-      const R = c.settled ? 4 : 2;
+      const R = c.townR ? c.townR + 1 : c.settled ? 4 : 2;
       const bx = Math.round(c.tx), by = Math.round(c.ty);
       for (let dy = -R; dy <= R; dy++) {
         for (let dx = -R; dx <= R; dx++) {
@@ -885,6 +955,8 @@ export class WorldRenderer {
     for (const [id, c] of this.camps) if (!seen.has(id)) { c.destroy(); this.camps.delete(id); }
     if (this.info) this.updateCleared();
     this.fauna.updateBands(bands);
+    this.fleet.updateBands(bands);
+    this.trains.updateBands(bands);
     this.updateRealms(bands);
   }
 
@@ -1217,6 +1289,8 @@ export class WorldRenderer {
       if (on) c.frame(nowMs, zoom);
     }
     this.fauna.frame(performance.now(), Math.min(0.1, dt / 60));
+    this.fleet.frame(performance.now(), Math.min(0.1, dt / 60));
+    this.trains.frame(performance.now(), Math.min(0.1, dt / 60));
     this.secretFrame(nowMs, zoom, winter);
   }
 }
@@ -1297,7 +1371,8 @@ export class PersonSprite {
     if (this.star) this.star.position.set(3.2, -Math.abs(this.body.height) - 1.5);
   }
 
-  private setPose(name: string) {
+  private setPose(raw: string) {
+    const name = this.dress(raw);
     if (name === this.pose) return;
     this.pose = name;
     this.r.atlas.set(this.body, name);
@@ -1337,6 +1412,29 @@ export class PersonSprite {
       sp.tint = 0xff2a2a;
       sp.position.set(Math.cos(a) * d, Math.sin(a) * d);
     });
+  }
+
+  private dressT: Set<string> | undefined;
+  private dressN = -1;
+  private dressP = '';
+  /** everyday clothes of the band's age: the same pose from the sheets of that age (BS-CD), when there is one */
+  private dress(name: string): string {
+    const t = this.r.bandTech.get(this.band);
+    if (t !== this.dressT || (t?.size ?? 0) !== this.dressN) {
+      this.dressT = t;
+      this.dressN = t?.size ?? 0;
+      this.dressP = !t ? '' : t.has('moon_base') ? 'e8' : t.has('computer') ? 'e7' : t.has('steam_engine') ? 'e6' : t.has('caravel') ? 'e5'
+        : t.has('heavy_plough') ? 'e4' : t.has('bronze') ? 'e2' : '';
+    }
+    if (!this.dressP) return name;
+    const m = /^([a-z0-9]+?)(\d*)$/.exec(name);
+    if (!m) return name;
+    // from the early modern age on nobody hunts or fishes with a spear in town any more: they just stand there
+    const late = this.dressP >= 'e5' ? LATE_DRESS[m[1]] : undefined;
+    const base = late ?? DRESS[m[1]];
+    if (!base) return name;
+    const dressed = `${this.dressP}${base}${late ? '' : m[2]}`;
+    return this.r.atlas.has(dressed) ? dressed : name;
   }
 
   /** a stable pick per person, so the pose does not flicker */
@@ -1394,6 +1492,27 @@ export class PersonSprite {
       if (task === 'chop') return loop('carry', 8, 110);
       // bronze age: some men ride, some take a cart to the neighbours
       if (man && knows('horse') && hash(this.id, 53) < 0.2) return loop('rider', 4, 160);
+      // information age: joggers, people looking at their phones, children on kick scooters, couriers
+      // space age: robot dogs, hover scooters, children with toy drones, old couples hand in hand
+      if (knows('moon_base')) {
+        if (this.female && this.age >= 16 && this.age < 56 && knows('ai') && hash(this.id, 141) < 0.12) { const c = loop('robodogwalk', 4, 180); if (c) return c; }
+        if (man && knows('flying_car') && hash(this.id, 143) < 0.1) { const c = loop('hoverride', 4, 160); if (c) return c; }
+        if (this.age >= 6 && this.age < 14 && hash(this.id, 145) < 0.35) { const c = loop('dronekid', 4, 180); if (c) return c; }
+        if (this.age > 60 && hash(this.id, 147) < 0.2) { const c = loop('eldercouple', 4, 220); if (c) return c; }
+      }
+      if (knows('computer')) {
+        if (man && this.age < 45 && hash(this.id, 121) < 0.1) { const c = loop('jogger', 4, 120); if (c) return c; }
+        if (this.age >= 14 && this.age < 50 && knows('smartphone') && hash(this.id, 123) < 0.15) { const c = loop('phonewalk', 4, 180); if (c) return c; }
+        if (this.age >= 7 && this.age < 14 && hash(this.id, 125) < 0.35) { const c = loop('kickscooter', 4, 160); if (c) return c; }
+        if (man && knows('internet') && hash(this.id, 127) < 0.08) { const c = loop('courier', 4, 150); if (c) return c; }
+      }
+      // industrial age: cyclists, prams, paper boys, ladies with dogs and motor cars
+      if (knows('steam_engine') && !knows('computer')) {
+        if (man && knows('school') && hash(this.id, 97) < 0.08) { const c = loop('cyclist', 4, 150); if (c) return c; }
+        if (this.female && this.age >= 18 && this.age < 45 && knows('vaccine') && hash(this.id, 99) < 0.08) { const c = loop('pram', 4, 190); if (c) return c; }
+        if (!this.female && this.age >= 9 && this.age < 15 && knows('newspaper') && hash(this.id, 101) < 0.3) { const c = loop('paperboy', 4, 160); if (c) return c; }
+        if (this.female && this.age >= 18 && knows('factory') && hash(this.id, 103) < 0.08) { const c = loop('lady', 4, 190); if (c) return c; }
+      }
       // early modern age: coaches, town criers, couples out for a walk, sailors with their sea bags
       if (man && (knows('post') || knows('palace')) && hash(this.id, 79) < 0.1) { const c = loop('coach', 4, 170); if (c) return c; }
       if (man && knows('newspaper') && hash(this.id, 81) < 0.06) { const c = loop('crier', 4, 170); if (c) return c; }
@@ -1431,7 +1550,22 @@ export class PersonSprite {
       case 'gather': return this.female && this.age < 56 ? loop('pick', 4, 340) : null;
       case 'fish': return !this.female ? loop('spearfish', 4, 340) : null;
       case 'craft':
+        if (knows('moon_base')) {
+          if (knows('robots') && hash(this.id, 151) < 0.25) { const c = loop('technician', 4, 500); if (c) return c; }
+          if (this.female && knows('vertical_farm') && hash(this.id, 153) < 0.4) { const c = loop('botanist', 4, 500); if (c) return c; }
+          if (hash(this.id, 155) < 0.25) { const c = loop('engineer', 4, 600); if (c) return c; }
+          if (this.age < 45 && hash(this.id, 157) < 0.25) { const c = loop('astronaut', 4, 600); if (c) return c; }
+        }
+        if (knows('computer')) {
+          if (knows('antibiotics') && hash(this.id, 131) < 0.12) { const c = loop('doctor', 4, 600); if (c) return c; }
+          if (hash(this.id, 133) < 0.3) { const c = loop('programmer', 4, 700); if (c) return c; }
+          if (this.female && hash(this.id, 135) < 0.5) { const c = loop('scientist', 4, 600); if (c) return c; }
+          if (!this.female && hash(this.id, 137) < 0.5) { const c = loop('builder', 4, 500); if (c) return c; }
+        }
         if (!this.female) {
+          if (knows('factory') && hash(this.id, 105) < 0.25) { const c = loop('stoker', 4, 300); if (c) return c; }
+          if (knows('telegraph') && hash(this.id, 107) < 0.1) { const c = loop('telegraphist', 4, 500); if (c) return c; }
+          if (knows('photography') && hash(this.id, 109) < 0.1) { const c = loop('photographer', 4, 600); if (c) return c; }
           if (knows('telescope') && hash(this.id, 87) < 0.1) { const c = loop('astronomer', 4, 600); if (c) return c; }
           if (knows('newspaper') && hash(this.id, 89) < 0.15) { const c = loop('printer', 4, 350); if (c) return c; }
           if (knows('telescope') && hash(this.id, 91) < 0.15) { const c = loop('glassblower', 4, 350); if (c) return c; }
@@ -1443,6 +1577,7 @@ export class PersonSprite {
           if ((knows('arch') || knows('aqueduct')) && hash(this.id, 59) < 0.3) return loop('mason', 4, 300);
           return (knows('iron') ? loop('ismith', 4, 280) : null) ?? (knows('bronze') ? loop('smith', 4, 260) : null) ?? loop('knap', 4, 300);
         }
+        if (knows('factory') && hash(this.id, 111) < 0.4) { const c = loop('seamstress', 4, 300); if (c) return c; }
         if (knows('medicine') && hash(this.id, 59) < 0.3) return loop('healer', 4, 420);
         if (knows('guilds') && hash(this.id, 55) < 0.5) return loop('spinner', 4, 380);
         if (knows('wheel') && hash(this.id, 55) < 0.5) return loop('wheelpot', 4, 420);
@@ -1455,6 +1590,9 @@ export class PersonSprite {
   /** guards (and the bodyguard) wear the best gear of their time: bronze once the band knows it */
   private guardKit(): string {
     const t = this.r.bandTech.get(this.band);
+    if (t?.has('moon_base') && this.r.atlas.has('rgwalk0')) return 'rg';
+    if (t?.has('computer') && this.r.atlas.has('ogwalk0')) return 'og';
+    if (t?.has('steam_engine') && this.r.atlas.has('wgwalk0')) return 'wg';
     if ((t?.has('star_fort') || t?.has('caravel')) && this.r.atlas.has('pgwalk0')) return 'pg';
     if ((t?.has('knighthood') || t?.has('castle')) && this.r.atlas.has('mgwalk0')) return 'mg';
     if (t?.has('iron') && this.r.atlas.has('igwalk0')) return 'ig';
@@ -1553,6 +1691,17 @@ export class PersonSprite {
     this.c.destroy({ children: true });
   }
 }
+
+/** stone age pose -> the pose with the same meaning on the sheets with the clothes of each age */
+const DRESS: Record<string, string> = {
+  walk: 'walk', womanwalk: 'womanwalk', oldwalk: 'oldwalk', boywalk: 'boywalk', girlwalk: 'girlwalk',
+  man: 'man', woman: 'woman', elder: 'elder', wave: 'wave', hunter: 'man', potter: 'woman2', spinner: 'woman2', waterjar: 'woman',
+  gatherer: 'gatherer', reedcarrier: 'gatherer', carrier: 'carrier', woman2: 'woman2',
+  oldwoman: 'oldwoman', oldherbs: 'oldwoman', oldscarf: 'oldwoman', oldbasket: 'oldwoman',
+  boy: 'boy', girl: 'girl', kidwave: 'kidwave', kidtoy: 'kidtoy', kidberries: 'girl', kidpuppy: 'kidwave', kidstick: 'kidtoy', kidfish: 'boy',
+};
+/** stone age work with spears and flint, shown as a dressed pose from the early modern age on */
+const LATE_DRESS: Record<string, string> = { throw: 'man', spearfish: 'carrier', pick: 'gatherer', knap: 'man' };
 
 // Props a band shows in its camp once it knows the matching technology.
 const PROPS: [string, string, boolean | null][] = [
@@ -1658,7 +1807,67 @@ const PROPS: [string, string, boolean | null][] = [
   ['palace', 'sedan', true],
   ['academy', 'globe', true],
   ['academy', 'pclock', true],
+  // industrial age (sheets BL-BO)
+  ['steam_engine', 'steamengine', true],
+  ['steam_engine', 'coalcart', true],
+  ['balloon', 'balloon0', true],
+  ['factory', 'powerloom', true],
+  ['factory', 'girders', true],
+  ['factory', 'gaslamp', true],
+  ['vaccine', 'docbag', true],
+  ['railway', 'loco0', true],
+  ['railway', 'carriage', true],
+  ['railway', 'signal', true],
+  ['school', 'bench', true],
+  ['telegraph', 'telegraph', true],
+  ['photography', 'camera', true],
+  ['fertilizer', 'tractor', true],
+  ['fertilizer', 'churns', true],
+  ['sewer', 'pump', true],
+  ['electricity', 'bulbs', true],
+  ['automobile', 'motorcar', true],
+  ['radio', 'gramophone', true],
+  // information age (sheets CE-CF)
+  ['computer', 'pcdesk', true],
+  ['computer', 'trafficlight', true],
+  ['computer', 'busstop', true],
+  ['computer', 'postbox', true],
+  ['computer', 'parkbench2', true],
+  ['television', 'tvset', true],
+  ['television', 'satdish', true],
+  ['school', 'playground', true],
+  ['jet', 'vending', true],
+  ['green_revolution', 'recycling', true],
+  ['microchip', 'scooter', true],
+  ['mobile_phone', 'phonebox', true],
+  ['internet', 'kiosk', true],
+  ['solar_power', 'solarpanel', true],
+  ['solar_power', 'windturbine', true],
+  ['electric_car', 'charger', true],
+  // space age (sheet CL)
+  ['moon_base', 'spacesuit', true],
+  ['moon_base', 'scope2', true],
+  ['moon_base', 'futlamp', true],
+  ['moon_base', 'wavebench', true],
+  ['vertical_farm', 'hydrocrate', true],
+  ['vertical_farm', 'gardendome', true],
+  ['vertical_farm', 'planttower', true],
+  ['maglev', 'chargepad', true],
+  ['fusion', 'watertank', true],
+  ['ai', 'robodog', true],
+  ['ai', 'drone', true],
+  ['ai', 'gardenbot', true],
+  ['rewilding', 'airpillar', true],
+  ['rewilding', 'solartree', true],
+  ['flying_car', 'hoverscooter', true],
+  ['mars_colony', 'rover', true],
 ];
+/** what the space age replaces: the things of the information age */
+const SPACE_DROPS = new Set(['pcdesk', 'trafficlight', 'busstop', 'postbox', 'parkbench2', 'tvset', 'satdish', 'vending', 'recycling', 'scooter', 'phonebox', 'kiosk', 'solarpanel', 'windturbine', 'charger', 'tractor']);
+/** what the information age replaces: steam engines, gas lamps, gramophones and the first motor cars */
+const MODERN_DROPS = new Set(['steamengine', 'coalcart', 'balloon0', 'powerloom', 'girders', 'gaslamp', 'docbag', 'loco0', 'carriage', 'signal', 'bench', 'telegraph', 'camera', 'churns', 'pump', 'bulbs', 'motorcar', 'gramophone', 'globe', 'telescope', 'microscope', 'bfountain']);
+/** what the industrial age replaces: the early modern workshops, carts and chairs */
+const INDUSTRIAL_DROPS = new Set(['navtable', 'cargo', 'tradecart', 'glassfurn', 'newspress', 'sedan', 'pclock', 'coffee', 'bankchest', 'apothecary', 'potatoes', 'maize', 'mwell', 'spinwheel', 'guildsign', 'bell', 'clocktower', 'markethall', 'inn']);
 /** what the early modern age replaces: the knights' things, the old crafts and the cog */
 const EARLY_DROPS = new Set(['hplough', 'quintain', 'warhorse', 'tourney', 'farrier', 'papervat', 'lectern', 'haycart', 'barrow', 'cog', 'compass', 'tannery', 'brewery', 'printpress']);
 const STAR_SWAPS: Record<string, string> = { tower: 'sfbastion', itower: 'sfbastion', ctower: 'sfbastion', gate: 'sfgate', igate: 'sfgate', cgate: 'sfgate' };
@@ -1702,6 +1911,9 @@ export class CampSprite {
   dwelling: BandView['dwelling'] = 'none';
   building: { s: Sprite; base: string; t0: number; flip: boolean }[] = [];
   ship: Sprite | null = null;
+  /** how far the town reaches, in tiles (0 for a village or a camp) */
+  townR = 0;
+  shipKind = 'galleon';
 
   constructor(r: WorldRenderer, b: BandView) {
     this.r = r;
@@ -1755,6 +1967,28 @@ export class CampSprite {
     return { x: p.x - this.pos.x, y: p.y - this.pos.y };
   }
 
+  /** the town's own tiles within R steps, nearest first (not the middle one, where the fire is) */
+  private townTiles(R: number): [number, number][] {
+    const bx = Math.round(this.tx), by = Math.round(this.ty);
+    const L0 = this.r.levelAt(bx, by);
+    const out: [number, number, number][] = [];
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const d = Math.hypot(dx, dy);
+      if (d < 0.5 || d > R + 0.4) continue;
+      // two streets cross at the fire: no buildings on them
+      if ((dx === 0 || dy === 0) && d >= 1.5) continue;
+      const x = bx + dx, y = by + dy;
+      if (!this.r.walkable(x, y) || Math.abs(this.r.levelAt(x, y) - L0) > 1) continue;
+      out.push([x, y, d + hash(x, y + 77) * 0.4]);
+    }
+    return out.sort((p, q) => p[2] - q[2]).map(([x, y]) => [x, y]);
+  }
+
+  private tileSpot([x, y]: [number, number]): { x: number; y: number } {
+    const p = this.r.tileTop(x, y);
+    return { x: p.x - this.pos.x, y: p.y - this.pos.y };
+  }
+
   /** the first good spot on a ring: the wanted one, then closer in, then a little to the side */
   private ringSpot(a: number, rad: number): { x: number; y: number } | null {
     for (const [k, da] of [[1, 0], [0.7, 0], [1, 0.35], [1, -0.35], [0.45, 0], [0.7, 0.6], [0.7, -0.6]]) {
@@ -1788,9 +2022,8 @@ export class CampSprite {
         .poly([-4, 0, 4, 0, 0, 5]).fill(b.color);
       this.label.position.set(0, -2);
     }
-    this.updateFields(b);
     this.updateTrodden(b);
-    const n = Math.max(1, Math.min(10, Math.round(b.size / (b.dwelling === 'house' ? 6 : 5))));
+    let n = Math.max(1, Math.min(10, Math.round(b.size / (b.dwelling === 'house' ? 6 : 5))));
     const techs = new Set(b.techIds ?? b.techs);
     let props = PROPS.filter(([tech, sp, settled]) => techs.has(tech) && (settled === null || settled === b.settled) && this.r.atlas.has(sp)).map(([, s]) => s);
     // a big village keeps only its newest things around it (later techs are later in the list)
@@ -1802,6 +2035,12 @@ export class CampSprite {
     const early = medieval && techs.has('caravel') && this.r.atlas.has('brickb3');
     if (early) props = props.filter((p) => !EARLY_DROPS.has(p));
     if (early && techs.has('star_fort')) props = props.map((p) => STAR_SWAPS[p] ?? p);
+    const industrial = early && techs.has('steam_engine') && this.r.atlas.has('flatsb3');
+    if (industrial) props = props.filter((p) => !INDUSTRIAL_DROPS.has(p));
+    const modern = industrial && techs.has('computer') && this.r.atlas.has('blockb3');
+    if (modern) props = props.filter((p) => !MODERN_DROPS.has(p));
+    const space = modern && techs.has('moon_base') && this.r.atlas.has('ecob3');
+    if (space) props = props.filter((p) => !SPACE_DROPS.has(p));
     // a young colony over the sea: a wooden fort, log cabins, the flag and a jetty
     const colony = !!b.colony && b.dwelling === 'house' && b.size < 80 && this.r.atlas.has('logcabin');
     if (colony) props = ['colflag', 'jetty', ...props.filter((p) => !WALL_PROPS.has(p))];
@@ -1811,11 +2050,19 @@ export class CampSprite {
     props = [...walls, ...rest.slice(-(12 - walls.length))];
     // walls make a village a town: stone houses, and a temple once it keeps a calendar
     const town = b.dwelling === 'house' && techs.has('walls') && this.r.atlas.has('townb3');
+    // a town spreads out as it grows: every building on its own tile, the things around it further out
+    const tiles = town ? this.townTiles(Math.max(2, Math.min(5, 2 + Math.floor(b.size / 150)))) : [];
+    this.townR = town ? Math.max(2, Math.min(5, 2 + Math.floor(b.size / 150))) : 0;
+    if (town) n = Math.max(4, Math.min(tiles.length - Math.min(props.length, Math.floor(tiles.length / 3)), Math.round(b.size / 22)));
+    this.updateFields(b);
     // iron age towns: courtyard houses, the king's palace in a capital, a theatre and a school
     const capital = !!b.kingdom?.capital;
     const cold = this.r.tempAt(b.x, b.y) < 0.35;
     const tkind = `${b.dwelling}${town ? 'T' : ''}${town && iron ? `I${capital ? 'K' : ''}${techs.has('theatre') ? 'h' : ''}${techs.has('library') ? 'l' : ''}` : ''}`
       + `${town && medieval ? `M${techs.has('castle') ? 'c' : ''}${techs.has('gothic') ? 'g' : ''}${techs.has('monastery') ? 'm' : ''}` : ''}`
+      + `${town && space ? `S${['railway', 'fusion', 'vertical_farm', 'space_elevator', 'flying_car', 'maglev'].map((t) => (techs.has(t) ? t[0] : '')).join('')}` : ''}`
+      + `${town && modern ? `N${['jet', 'television', 'nuclear_power', 'rocket', 'automobile', 'school'].map((t) => (techs.has(t) ? t[0] : '')).join('')}${b.size > 300 ? 'B' : ''}` : ''}`
+      + `${town && industrial ? `X${['factory', 'railway', 'school', 'vaccine', 'electricity', 'academy', 'theatre'].map((t) => (techs.has(t) ? t[0] : '')).join('')}` : ''}`
       + `${town && early ? `E${['palace', 'telescope', 'banking', 'coffeehouse', 'newspaper', 'post'].map((t) => (techs.has(t) ? t[0] : '')).join('')}` : ''}${colony ? 'C' : ''}`;
     const key = `${tkind}:${n}:${b.settled}:${cold}:${props.join(',')}:${Math.round(b.x)},${Math.round(b.y)}`;
     if (key === this.key) return;
@@ -1838,7 +2085,61 @@ export class CampSprite {
         case 'hut': name = A.has('hutb3') ? 'hutb3' : 'roundhut'; break;
         default:
           if (colony) name = k === 0 ? 'colfort' : 'logcabin';
-          else if (town && early) {
+          else if (town && space) {
+            // terraced green houses and towers full of gardens round the spaceport, the observatory and the vertical farm
+            const big = b.size > 300;
+            if (k === 0) name = capital || big ? 'arcob3' : 'ecob3';
+            else if (k === 1) name = 'glassmarket2';
+            else if (k === 2 && techs.has('railway')) name = 'maglevstation';
+            else if (k === 3) name = 'school3';
+            else if (k === 4) name = 'medcenter';
+            else if (k === 5) name = techs.has('fusion') ? 'fusion' : 'windtower';
+            else if (k === 6) name = 'observatory2';
+            else if (k === 7) name = 'spacemuseum';
+            else if (k === 8) name = capital || big ? 'spaceportb3' : 'park2';
+            else if (k === 9 && techs.has('vertical_farm')) name = 'vfarm';
+            else if (k === 10) name = techs.has('space_elevator') && capital ? 'elevator' : 'robotshop';
+            else if (k === 11) name = 'cafe3';
+            else if (k === 12 && techs.has('flying_car')) name = 'skyport';
+            else if (k === 13) name = 'starmonument';
+            else if (k === 14) name = 'park2';
+            else if (k === 15 && capital) name = 'rocketpad';
+            else name = h < 0.4 ? 'ecob3' : h < 0.65 ? 'roundhouse' : h < 0.8 ? 'domehouse' : big && h < 0.9 ? 'arcob3' : 'windtower';
+          } else if (town && modern) {
+            // apartment blocks, offices and glass towers round the hospital, the school, the cinema and the station
+            const big = b.size > 300;
+            if (k === 0) name = capital || big ? 'skyscraperb3' : 'office';
+            else if (k === 1) name = 'supermarket';
+            else if (k === 2 && techs.has('railway')) name = 'stationb3';
+            else if (k === 3 && techs.has('school')) name = 'school2';
+            else if (k === 4) name = 'hospital2';
+            else if (k === 5) name = techs.has('nuclear_power') && h < 0.5 ? 'nuclear' : 'powerplant';
+            else if (k === 6 && techs.has('television')) name = 'cinema';
+            else if (k === 7) name = 'library';
+            else if (k === 8 && big) name = 'stadium';
+            else if (k === 9) name = techs.has('jet') && (capital || big) ? 'airportb3' : 'firestation2';
+            else if (k === 10 && techs.has('television')) name = 'tvtower';
+            else if (k === 11) name = 'cafe2';
+            else if (k === 12 && techs.has('automobile')) name = 'petrol';
+            else if (k === 13) name = 'park';
+            else if (k === 14 && techs.has('rocket') && capital) name = 'launchpad';
+            else if (k === 15 && techs.has('solar_power')) name = 'solarfarm';
+            else if (k === 16 && techs.has('rocket')) name = 'radioscope';
+            else name = h < 0.45 ? 'blockb3' : h < 0.7 ? 'house2' : h < 0.8 ? 'office' : big && h < 0.9 ? 'skyscraperb3' : 'flatsb3';
+          } else if (town && industrial) {
+            // brick flats and villas round the factory, the station, the school and the hospital
+            if (k === 0) name = capital && techs.has('palace') ? 'baroqueb3' : 'postoffice';
+            else if (k === 1 && techs.has('factory')) name = 'factoryb3';
+            else if (k === 2 && techs.has('railway')) name = 'stationb3';
+            else if (k === 3 && techs.has('school')) name = 'schoolhouse';
+            else if (k === 4 && (techs.has('vaccine') || techs.has('antibiotics'))) name = 'hospital';
+            else if (k === 5 && techs.has('electricity')) name = 'powerplant';
+            else if (k === 6) name = 'brickchurch';
+            else if (k === 7) name = 'store';
+            else if (k === 8 && techs.has('academy')) name = 'museum';
+            else if (k === 9 && techs.has('theatre')) name = 'theatre2';
+            else name = h < 0.4 ? 'flatsb3' : h < 0.7 ? 'villa' : h < 0.85 ? 'brickb3' : 'timberb3';
+          } else if (town && early) {
             // brick gable houses round the palace (in a capital), the observatory, the bank, the coffee house and the printers
             if (k === 0) name = capital && techs.has('palace') ? 'baroqueb3' : techs.has('castle') ? 'keepb3' : 'villab3';
             else if (k === 1) name = techs.has('gothic') ? 'churchb3' : 'brickb3';
@@ -1866,14 +2167,14 @@ export class CampSprite {
       }
       const a = (k / n) * Math.PI * 2 + 0.6;
       const rad = (b.dwelling === 'house' ? 26 : 19) + (k % 2) * 7;
-      const q = this.ringSpot(a, rad);
+      const q = town ? (tiles[k] ? this.tileSpot(tiles[k]) : null) : this.ringSpot(a, rad);
       if (!q) continue;
       const s = A.sprite(name);
       if (h < 0.5) s.scale.x *= -1;
       s.position.set(q.x, q.y);
       s.zIndex = s.y;
       this.homes.addChild(s);
-      if (k >= builtBefore && /^(hut|house|town|temple|villa|palace|theatre|school|keep|church|timber|abbey|baroque|observ|brick)b3$/.test(name)) {
+      if (k >= builtBefore && /^(hut|house|town|temple|villa|palace|theatre|school|keep|church|timber|abbey|baroque|observ|brick|flats|factory|station|skyscraper|airport|block|arco|spaceport|eco)b3$/.test(name)) {
         this.building.push({ s, base: name.slice(0, -1), t0: Date.now(), flip: s.scale.x < 0 });
         A.set(s, `${name.slice(0, -1)}0`);
         if (h < 0.5) s.scale.x *= -1;
@@ -1883,7 +2184,7 @@ export class CampSprite {
     props.forEach((name, k) => {
       const a = (k / Math.max(5, props.length)) * Math.PI * 2 + 2.1;
       const rad = (b.dwelling === 'house' ? 40 : 32) + (k % 2) * 5;
-      const q = this.ringSpot(a, rad);
+      const q = town && tiles[n + k] ? this.tileSpot(tiles[n + k]) : this.ringSpot(a, town ? (this.townR + 0.6) * TW * 0.7 : rad);
       if (!q) return;
       const s = A.sprite(name);
       s.position.set(q.x, q.y);
@@ -1893,8 +2194,9 @@ export class CampSprite {
     // an ocean ship rocks on the water next to a harbour town
     this.ship = null;
     const sea = techs.has('caravel') && b.settled && A.has('galleon0') ? this.harbourSpot(b) : null;
+    this.shipKind = techs.has('computer') && A.has('containership') ? 'containership' : techs.has('steamship') && A.has('steamer0') ? 'steamer' : 'galleon';
     if (sea) {
-      const s = A.sprite('galleon0');
+      const s = A.sprite(`${this.shipKind}0`);
       const p = this.r.tileTop(sea.x, sea.y);
       s.position.set(p.x - this.pos.x, p.y - this.pos.y);
       s.zIndex = s.y;
@@ -1955,13 +2257,14 @@ export class CampSprite {
     // ploughed in early spring, sprouts, tall wheat in summer, stubble and sheaves after the harvest
     const stage = m >= 2 && m <= 3 ? 0 : m <= 5 && m >= 4 ? 1 : m >= 6 && m <= 8 ? 2 : m >= 9 && m <= 10 ? 3 : 0;
     const bx = Math.round(b.x), by = Math.round(b.y);
-    const fkey = `${bx}:${by}:${count}:${stage}`;
+    const fkey = `${bx}:${by}:${count}:${stage}:${this.townR}`;
     if (fkey === this.fieldKey) return;
     this.fieldKey = fkey;
     this.fields.removeChildren().forEach((c) => c.destroy());
     if (!count) return;
     const A = this.r.atlas;
-    const ring: [number, number][] = [[3, 0], [0, 3], [3, 1], [1, 3], [3, -1], [-1, 3], [4, 0], [0, 4], [4, 1], [1, 4], [-3, 0], [0, -3]];
+    const off = this.townR ? this.townR + 1 : 3;
+    const ring: [number, number][] = [[off, 0], [0, off], [off, 1], [1, off], [off, -1], [-1, off], [off + 1, 0], [0, off + 1], [off + 1, 1], [1, off + 1], [-off, 0], [0, -off]];
     let placed = 0;
     for (const [dx, dy] of ring) {
       if (placed >= count) break;
@@ -1993,7 +2296,7 @@ export class CampSprite {
         return st < 3;
       });
     }
-    if (this.ship && !this.ship.destroyed) this.r.atlas.set(this.ship, `galleon${Math.floor(now / 400 + this.id) % 4}`);
+    if (this.ship && !this.ship.destroyed && this.shipKind !== 'containership') this.r.atlas.set(this.ship, `${this.shipKind}${Math.floor(now / 400 + this.id) % 4}`);
     const frameNo = this.hasFire ? 1 + (Math.floor(now / 130 + this.id * 7) % 3) : 0;
     if (frameNo !== this.fireFrame) {
       this.fireFrame = frameNo;

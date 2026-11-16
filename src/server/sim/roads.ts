@@ -6,10 +6,10 @@ import { Biome, RIVER_WATER, isWater } from '../../shared/types';
 import { Terrain, W, H } from './world';
 
 /** cost of stepping onto tile i, or Infinity where no road can go */
-function cost(t: Terrain, roads: Uint8Array, i: number): number {
+function cost(t: Terrain, roads: Uint8Array, i: number, mask: number): number {
   const b = t.biome[i];
   if (isWater(b)) return Infinity;
-  if (roads[i]) return 0.35;
+  if (roads[i] & mask) return 0.35;
   let c = 1;
   if (t.river[i] >= RIVER_WATER) c = 7; // a bridge is work
   if (b === Biome.Mountain) c += 5;
@@ -57,8 +57,9 @@ class Heap {
   }
 }
 
-/** the cheapest way from a to b (tile indices), or null if there is none close enough */
-export function findRoad(t: Terrain, roads: Uint8Array, a: number, b: number, maxNodes = 12000): number[] | null {
+/** the cheapest way from a to b (tile indices), or null if there is none close enough.
+ * `mask` picks what is cheap to follow: 3 any road, 4 a railway */
+export function findRoad(t: Terrain, roads: Uint8Array, a: number, b: number, maxNodes = 12000, mask = 3): number[] | null {
   const bx = b % W, by = (b - bx) / W;
   const g = new Map<number, number>();
   const from = new Map<number, number>();
@@ -81,7 +82,7 @@ export function findRoad(t: Terrain, roads: Uint8Array, a: number, b: number, ma
       const xx = x + dx, yy = y + dy;
       if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
       const j = yy * W + xx;
-      const c = j === b ? 1 : cost(t, roads, j);
+      const c = j === b ? 1 : cost(t, roads, j, mask);
       if (c === Infinity) continue;
       const ng = gi + c;
       if (ng < (g.get(j) ?? Infinity)) {

@@ -113,7 +113,7 @@ export interface BandView {
   /** settlers came over the sea (early modern age) */
   colony?: boolean;
   /** iron age: the kingdom of this town (place = its Bulgarian name) */
-  kingdom?: { id: number; place: string; capital: boolean; members: number; color: number; founded: number; allies?: string[] } | null;
+  kingdom?: { id: number; place: string; capital: boolean; members: number; color: number; founded: number; allies?: string[]; kings?: { id: number; name: string; from: number; to: number | null }[] } | null;
 }
 
 /** compact person: [id, x*10, y*10, taskIndex, bandId, ageYears, sex(0 m,1 f), chief(1) or not(0)] */
@@ -217,6 +217,11 @@ export interface TreeNode {
   generation: number;
   mother?: TreeNode | null;
   father?: TreeNode | null;
+  /** king, a king's wife, or a king's child */
+  royal?: 'king' | 'queen' | 'heir';
+  /** only on the root: the partner and the children (each with their own children) */
+  partner?: TreeNode | null;
+  children?: TreeNode[];
 }
 
 export interface FamilyTree {

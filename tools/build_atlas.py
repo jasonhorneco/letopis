@@ -343,6 +343,103 @@ group('strollers', cells('BJ', (3,)), 'pose', PEOPLE_WPP, 0)
 group('sailors', cells('BJ', (4,)), 'pose', PEOPLE_WPP, 0)
 group('pgwalk', cells('BK', (1, 2)), 'person', 13.6, 64)
 group('pgidle', cells('BK', (3, 4)), 'person', 13.6, 64)
+# industrial age (BL props, BM factory/station/bridge, BN town, BO trains and steamers, BP workers, BQ travellers, BR watchman)
+for cid, name, w in (('BL11', 'steamengine', 0.055), ('BL12', 'powerloom', 0.055), ('BL13', 'coalcart', 0.05), ('BL14', 'girders', 0.05),
+                     ('BL21', 'sewing', 0.045), ('BL22', 'camera', 0.045), ('BL23', 'telegraph', 0.05), ('BL24', 'gaslamp', 0.035),
+                     ('BL31', 'pennyfar', 0.045), ('BL32', 'gramophone', 0.04), ('BL33', 'bulbs', 0.05), ('BL34', 'docbag', 0.045),
+                     ('BL41', 'tractor', 0.055), ('BL42', 'churns', 0.04), ('BL43', 'bench', 0.045), ('BL44', 'pump', 0.04),
+                     ('BM31', 'ironbridge', 0.085), ('BM32', 'watertower', 0.06), ('BM33', 'gasholder', 0.08), ('BM34', 'powerplant', 0.09),
+                     ('BM41', 'rail', 0.07), ('BM42', 'railcurve', 0.07), ('BM43', 'signal', 0.045), ('BM44', 'signalbox', 0.06),
+                     ('BN21', 'villa', 0.08), ('BN22', 'schoolhouse', 0.085), ('BN23', 'hospital', 0.09), ('BN24', 'store', 0.09),
+                     ('BN31', 'postoffice', 0.085), ('BN32', 'museum', 0.09), ('BN33', 'bandstand', 0.07), ('BN34', 'glassmarket', 0.09),
+                     ('BN41', 'firestation', 0.08), ('BN42', 'theatre2', 0.09), ('BN43', 'ifountain', 0.06), ('BN44', 'brickchurch', 0.08),
+                     ('BO41', 'carriage', 0.07), ('BO42', 'goodswagon', 0.065), ('BO43', 'horsetram', 0.07), ('BO44', 'motorcar', 0.055)):
+    group(name, cid, 'thing', w, 0)
+group('factoryb', cells('BM', (1,)), 'thing', 0.11, 0)    # 0..3: factory
+group('stationb', cells('BM', (2,)), 'thing', 0.11, 0)    # 0..3: railway station
+group('flatsb', cells('BN', (1,)), 'thing', 0.085, 0)     # 0..3: brick apartment house
+group('loco', cells('BO', (1,)), 'thing', 0.075, 0)       # 4 frames
+group('steamer', cells('BO', (2,)), 'thing', 0.09, 0)     # 4 frames
+group('balloon', cells('BO', (3,)), 'thing', 0.06, 0)     # 4 frames
+group('stoker', cells('BP', (1,)), 'pose', PEOPLE_WPP, 0)
+group('seamstress', cells('BP', (2,)), 'pose', PEOPLE_WPP, 0)
+group('telegraphist', cells('BP', (3,)), 'pose', PEOPLE_WPP, 0)
+group('photographer', cells('BP', (4,)), 'pose', PEOPLE_WPP, 0)
+group('cyclist', cells('BQ', (1,)), 'pose', PEOPLE_WPP, 0)
+group('pram', cells('BQ', (2,)), 'pose', PEOPLE_WPP, 0)
+group('paperboy', cells('BQ', (3,)), 'pose', PEOPLE_WPP, 0)
+group('lady', cells('BQ', (4,)), 'pose', PEOPLE_WPP, 0)
+group('wgwalk', cells('BR', (1, 2)), 'person', 13.6, 64)
+group('wgidle', cells('BR', (3, 4)), 'person', 13.6, 64)
+# information age (CE props, CF skyscraper/airport/plants, CG town, CH cars, buses, planes, CI workers, CJ travellers, CK patrol officer)
+for cid, name, w in (('CE11', 'satdish', 0.05), ('CE12', 'pcdesk', 0.055), ('CE13', 'tvset', 0.05), ('CE14', 'phonebox', 0.045),
+                     ('CE21', 'solarpanel', 0.06), ('CE22', 'charger', 0.045), ('CE23', 'trafficlight', 0.045), ('CE24', 'busstop', 0.06),
+                     ('CE31', 'playground', 0.07), ('CE32', 'recycling', 0.055), ('CE33', 'postbox', 0.04), ('CE34', 'parkbench2', 0.055),
+                     ('CE41', 'windturbine', 0.06), ('CE42', 'vending', 0.045), ('CE43', 'kiosk', 0.06), ('CE44', 'scooter', 0.05),
+                     ('CF31', 'nuclear', 0.1), ('CF32', 'tvtower', 0.07), ('CF33', 'solarfarm', 0.09), ('CF34', 'radioscope', 0.08),
+                     ('CF41', 'mrail', 0.07), ('CF42', 'mrailcurve', 0.07), ('CF43', 'msignal', 0.045), ('CF44', 'launchpad', 0.08),
+                     ('CG21', 'house2', 0.085), ('CG22', 'school2', 0.095), ('CG23', 'hospital2', 0.095), ('CG24', 'supermarket', 0.095),
+                     ('CG31', 'cinema', 0.09), ('CG32', 'stadium', 0.1), ('CG33', 'library', 0.09), ('CG34', 'office', 0.09),
+                     ('CG41', 'firestation2', 0.09), ('CG42', 'petrol', 0.09), ('CG43', 'cafe2', 0.085), ('CG44', 'park', 0.09),
+                     ('CH41', 'etrain', 0.08), ('CH42', 'containership', 0.1), ('CH43', 'helicopter', 0.06), ('CH44', 'truck', 0.065)):
+    group(name, cid, 'thing', w, 0)
+group('skyscraperb', cells('CF', (1,)), 'thing', 0.1, 0)   # 0..3: glass skyscraper
+group('airportb', cells('CF', (2,)), 'thing', 0.12, 0)     # 0..3: airport with tower
+group('blockb', cells('CG', (1,)), 'thing', 0.09, 0)       # 0..3: apartment block
+group('car', cells('CH', (1,)), 'thing', 0.055, 0)         # 4 frames
+group('bus', cells('CH', (2,)), 'thing', 0.075, 0)         # 4 frames
+group('plane', cells('CH', (3,)), 'thing', 0.09, 0)        # 4 frames
+group('programmer', cells('CI', (1,)), 'pose', PEOPLE_WPP, 0)
+group('scientist', cells('CI', (2,)), 'pose', PEOPLE_WPP, 0)
+group('builder', cells('CI', (3,)), 'pose', PEOPLE_WPP, 0)
+group('doctor', cells('CI', (4,)), 'pose', PEOPLE_WPP, 0)
+group('jogger', cells('CJ', (1,)), 'pose', PEOPLE_WPP, 0)
+group('phonewalk', cells('CJ', (2,)), 'pose', PEOPLE_WPP, 0)
+group('kickscooter', cells('CJ', (3,)), 'pose', PEOPLE_WPP, 0)
+group('courier', cells('CJ', (4,)), 'pose', PEOPLE_WPP, 0)
+group('ogwalk', cells('CK', (1, 2)), 'person', 13.6, 64)
+group('ogidle', cells('CK', (3, 4)), 'person', 13.6, 64)
+# space age (CL props, CM green tower/spaceport/plants, CN town, CO maglev, flying cars, rockets, CP workers, CQ travellers, CR ranger)
+for cid, name, w in (('CL11', 'hoverscooter', 0.05), ('CL12', 'gardendome', 0.065), ('CL13', 'drone', 0.045), ('CL14', 'robodog', 0.04),
+                     ('CL21', 'rover', 0.055), ('CL22', 'planttower', 0.06), ('CL23', 'solartree', 0.06), ('CL24', 'spacesuit', 0.045),
+                     ('CL31', 'hydrocrate', 0.06), ('CL32', 'chargepad', 0.05), ('CL33', 'airpillar', 0.045), ('CL34', 'scope2', 0.045),
+                     ('CL41', 'wavebench', 0.055), ('CL42', 'gardenbot', 0.05), ('CL43', 'watertank', 0.055), ('CL44', 'futlamp', 0.035),
+                     ('CM31', 'fusion', 0.1), ('CM32', 'elevator', 0.09), ('CM33', 'vfarm', 0.09), ('CM34', 'rocketpad', 0.085),
+                     ('CM41', 'maglevbeam', 0.07), ('CM42', 'maglevcurve', 0.07), ('CM43', 'maglevstation', 0.09), ('CM44', 'domehouse', 0.09),
+                     ('CN21', 'roundhouse', 0.085), ('CN22', 'school3', 0.095), ('CN23', 'medcenter', 0.095), ('CN24', 'glassmarket2', 0.095),
+                     ('CN31', 'observatory2', 0.09), ('CN32', 'spacemuseum', 0.095), ('CN33', 'park2', 0.09), ('CN34', 'windtower', 0.07),
+                     ('CN41', 'robotshop', 0.09), ('CN42', 'skyport', 0.095), ('CN43', 'cafe3', 0.09), ('CN44', 'starmonument', 0.07),
+                     ('CO41', 'cargodrone', 0.06), ('CO42', 'airship', 0.1), ('CO43', 'pod', 0.05), ('CO44', 'starship', 0.12)):
+    group(name, cid, 'thing', w, 0)
+group('arcob', cells('CM', (1,)), 'thing', 0.1, 0)        # 0..3: green tower with gardens
+group('spaceportb', cells('CM', (2,)), 'thing', 0.12, 0)  # 0..3: spaceport
+group('ecob', cells('CN', (1,)), 'thing', 0.095, 0)       # 0..3: terraced eco apartments
+group('maglev', cells('CO', (1,)), 'thing', 0.09, 0)      # 4 frames
+group('flycar', cells('CO', (2,)), 'thing', 0.055, 0)     # 4 frames
+group('launch', cells('CO', (3,)), 'thing', 0.085, 0)     # 4 frames: a rocket lifts off
+group('technician', cells('CP', (1,)), 'pose', PEOPLE_WPP, 0)
+group('botanist', cells('CP', (2,)), 'pose', PEOPLE_WPP, 0)
+group('engineer', cells('CP', (3,)), 'pose', PEOPLE_WPP, 0)
+group('astronaut', cells('CP', (4,)), 'pose', PEOPLE_WPP, 0)
+group('robodogwalk', cells('CQ', (1,)), 'pose', PEOPLE_WPP, 0)
+group('hoverride', cells('CQ', (2,)), 'pose', PEOPLE_WPP, 0)
+group('dronekid', cells('CQ', (3,)), 'pose', PEOPLE_WPP, 0)
+group('eldercouple', cells('CQ', (4,)), 'pose', PEOPLE_WPP, 0)
+group('rgwalk', cells('CR', (1, 2)), 'person', 13.6, 64)
+group('rgidle', cells('CR', (3, 4)), 'person', 13.6, 64)
+# everyday clothes of each age (sheets BS-CD, two per age: adults, then children and more poses); prefix e<era>
+for pre, a, b in (('e2', 'BS', 'BT'), ('e4', 'BU', 'BV'), ('e5', 'BW', 'BX'), ('e6', 'BY', 'BZ'), ('e7', 'CA', 'CB'), ('e8', 'CC', 'CD')):
+    group(pre + 'walk', cells(a, (1,)), 'person', 11, 64)
+    group(pre + 'womanwalk', cells(a, (2,)), 'person', 11, 64)
+    group(pre + 'oldwalk', cells(a, (3,)), 'person', 10.5, 64)
+    for c, nm in enumerate(('man', 'woman', 'elder', 'wave'), 1):
+        group(pre + nm, f'{a}4{c}', 'person', 11, 64)
+    group(pre + 'boywalk', cells(b, (1,)), 'person', 8, 56)
+    group(pre + 'girlwalk', cells(b, (2,)), 'person', 8, 56)
+    for c, nm in enumerate(('boy', 'girl', 'kidwave', 'kidtoy'), 1):
+        group(pre + nm, f'{b}3{c}', 'person', 8, 56)
+    for c, nm, w in ((1, 'gatherer', 11), (2, 'carrier', 11), (3, 'oldwoman', 10.5), (4, 'woman2', 11)):
+        group(pre + nm, f'{b}4{c}', 'person', w, 64)
 # band symbols (white, tinted in game), same order as SYMBOLS in render.ts
 group('sym', 'AQ101 AQ102 AQ103 AQ104 AQ105 AQ106 AQ107 AQ108 AQ109 AQ110 AQ201 AQ202 AQ203 AQ204 AQ205 AQ206 AQ207 AQ208 AQ209 AQ210 AQ301 AQ302 AQ303 AQ304 AQ305 AQ306 AQ307 AQ308 AQ309 AQ310 AQ401 AQ402 AQ403 AQ404 AQ405 AQ406 AQ407 AQ408 AQ409 AQ410 AQ501 AQ502 AQ503 AQ504 AQ505 AQ506 AQ507 AQ508 AQ509 AQ510 AR101 AR102 AR103 AR104 AR105 AR106 AR107 AR108 AR109 AR110 AR201 AR202 AR203 AR204 AR205 AR206 AR207 AR208 AR209 AR210 AR301 AR302 AR303 AR304 AR305 AR306 AR307 AR308 AR309 AR310 AR401 AR402 AR403 AR404 AR405 AR406 AR407 AR408 AR409 AR410 AR501 AR502 AR503 AR504 AR505 AR506 AR507 AR508 AR509 AR510', 'symbol', 6, 64)
 
@@ -393,14 +490,15 @@ def top_only(img: Image.Image, cy: float) -> Image.Image:
     return Image.fromarray(out.astype(np.uint8))
 
 
-def split_cloth(img: Image.Image, head: float, bright: float = 0.45, satmax: float = 0.2) -> tuple[Image.Image, Image.Image]:
-    """Light grey/white cloth -> separate grey layer; the rest stays in the base."""
+def split_cloth(img: Image.Image, head: float, bright: float = 0.45, satmax: float = 0.2, upto: float = 1.0) -> tuple[Image.Image, Image.Image]:
+    """Light grey/white cloth -> separate grey layer; the rest stays in the base. Only rows from head to upto (share of the height)."""
     a = np.array(img).astype(np.float32)
     rgb = a[..., :3] / 255
     mx, mn = rgb.max(-1), rgb.min(-1)
     sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0)
     cloth = (sat < satmax) & (mx > bright) & (a[..., 3] > 0)
     cloth[: int(a.shape[0] * head)] = False
+    cloth[int(a.shape[0] * upto):] = False
     base = a.copy()
     base[cloth, 3] = 0
     c = np.zeros_like(a)
@@ -547,6 +645,13 @@ def main() -> int:
                 items.append((name, img, 0.5, ay, s))
                 items.append((name + '_t', top_only(img, ay * h), 0.5, ay, s))
                 continue
+            if (kind == 'person' and cid[:2] in ('CA', 'CB', 'CC', 'CD', 'CR')) or (kind == 'pose' and cid[:2] in ('CP', 'CQ')):
+                # today and the future: white clothes stay white, only the collar takes the clan colour
+                kid = cid[:2] in ('CB', 'CD') and cid[2] in '123'
+                base, cloth = split_cloth(img, 0.36 if kid else 0.25, upto=0.47 if kid else 0.36)
+                items.append((name, base, 0.5, ay, s))
+                items.append((name + '_c', cloth, 0.5, ay, s))
+                continue
             if kind == 'pose' and cid[:2] in ('AB', 'AC', 'AD', 'AE'):
                 # sleeping people lie down (no head on top); the storyteller's long beard reaches half way down
                 head = 0 if cid[:3] in ('AC1', 'AC2') else 0.55 if cid[:2] == 'AD' else 0.3
@@ -554,14 +659,14 @@ def main() -> int:
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))
                 continue
-            if kind == 'pose' and cid[:2] in ('AI', 'AJ', 'AV', 'AW', 'BB', 'BC', 'BI', 'BJ'):
+            if kind == 'pose' and cid[:2] in ('AI', 'AJ', 'AV', 'AW', 'BB', 'BC', 'BI', 'BJ', 'BP', 'BQ', 'CI', 'CJ'):
                 # bronze age linen: only the bright cloth is tinted (grey anvils and stones stay)
-                head = {'AI3': 0.35, 'AJ2': 0.35, 'AJ4': 0.0, 'AW2': 0.0, 'AV3': 0.35, 'BB1': 0.35, 'BB4': 0.35, 'BC2': 0.0, 'BJ1': 0.0, 'BI2': 0.35, 'BI3': 0.35}.get(cid[:3], 0.28)
+                head = {'AI3': 0.35, 'AJ2': 0.35, 'AJ4': 0.0, 'AW2': 0.0, 'AV3': 0.35, 'BB1': 0.35, 'BB4': 0.35, 'BC2': 0.0, 'BJ1': 0.0, 'BI2': 0.35, 'BI3': 0.35, 'BQ1': 0.0, 'BQ2': 0.0, 'BQ4': 0.0}.get(cid[:3], 0.28)
                 base, cloth = split_cloth(img, head, 0.66)
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))
                 continue
-            if kind == 'person' and cid[:2] in ('AN', 'AO', 'AX', 'BD', 'BK'):
+            if kind == 'person' and cid[:2] in ('AN', 'AO', 'AX', 'BD', 'BK', 'BR', 'CK'):
                 # guards: only the light tunic takes the clan colour, the grey wolf fur and the metal stay
                 base, cloth = split_fur(img, 0.3) if cid[:2] == 'AN' else split_cloth(img, 0.3, 0.72, 0.3)
                 items.append((name, base, 0.5, ay, s))

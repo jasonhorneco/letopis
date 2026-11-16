@@ -153,6 +153,13 @@ a.ref:hover { border-bottom-style: solid; }
 .tbox b { display: block; font-weight: 600; font-size: 13.5px; }
 .tbox small { color: var(--muted); font-size: 12px; }
 .tbox:not(.empty):hover { border-color: var(--accent-2); }
+.tbox.royal { box-shadow: inset 0 0 0 1px rgba(240, 200, 90, 0.55); }
+.tfam { display: flex; flex-direction: column; gap: 8px; }
+.trow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.trow > .muted { width: 70px; font-size: 13px; }
+.tkids { font-size: 13px; flex: 1 1 160px; }
+.kingdoms details.kings { margin-top: 4px; }
+.kingdoms details.kings ol { margin: 4px 0 0 18px; padding: 0; font-size: 13px; }
 .tline { margin-top: 8px; }
 .tline summary { cursor: pointer; color: var(--accent-2); }
 .tline ol { max-height: 260px; overflow-y: auto; margin: 8px 0 0; padding-left: 28px; font-size: 14px; }
