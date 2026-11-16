@@ -23,6 +23,8 @@ const ERA_WHY: Record<number, [string, string]> = {
   4: ['Замъци пазят селата, манастирите пазят знанието, а вятърът и водата мелят брашното.', 'Castles guard the villages, monasteries guard knowledge, and wind and water grind the flour.'],
   5: ['Корабите прекосяват откритото море, на далечни брегове никнат нови села, а вестниците разнасят новините.', 'Ships cross the open sea, new villages spring up on distant shores, and newspapers carry the news.'],
   6: ['Парата движи машини, кораби и влакове, а фабриките правят стоки за всички.', 'Steam drives machines, ships and trains, and factories make goods for everyone.'],
+  7: ['Компютрите смятат, картините летят по въздуха, а една мрежа свързва целия свят.', 'Computers count, pictures fly through the air, and one network joins the whole world.'],
+  8: ['Хората живеят на Луната, а корабите им летят към планетите.', 'People live on the Moon, and their ships fly to the planets.'],
 };
 /** chance per band and month for an idea whose time has come */
 const GLOBAL_DISCOVERY = 0.0003;
@@ -136,10 +138,12 @@ export interface SimState {
   firsts?: { tech: string; pid: number; name: string; band: string; year: number }[];
   /** size of every tree, one byte per tile (0 none .. 4 big); missing before v1.11 */
   trees?: string;
-  /** road on every tile (0 none, 1 dirt, 2 paved); missing before v1.20 */
+  /** road on every tile (0 none, 1 dirt, 2 paved; +4 a railway, from v1.51); missing before v1.20 */
   roads?: string;
   /** village pairs joined by a road, as 'a-b:level' */
   roadPairs?: string[];
+  /** town pairs joined by a railway, as 'a-b' (9 behind it: no way there) (from v1.51) */
+  railPairs?: string[];
   /** iron age kingdoms (from v1.35) */
   kingdoms?: Kingdom[];
   /** everyone who ever wore a crown (from v1.41) */
@@ -321,10 +325,45 @@ export class Simulation {
   }
 
   private setRoad(i: number, lvl: number) {
-    if (this.roads[i] >= lvl) return;
-    this.roads[i] = lvl;
-    this.roadChanges.push(i, lvl);
+    if ((this.roads[i] & 3) >= lvl) return;
+    this.roads[i] = (this.roads[i] & 4) | lvl;
+    this.roadChanges.push(i, this.roads[i]);
     if (this.trees[i]) this.setTree(i, 0);
+  }
+
+  private setRail(i: number) {
+    if (this.roads[i] & 4) return;
+    this.roads[i] |= 4;
+    this.roadChanges.push(i, this.roads[i]);
+    if (this.trees[i]) this.setTree(i, 0);
+  }
+
+  /** once a year towns that know the railway lay tracks to the nearest towns that know it too */
+  private buildRails() {
+    const towns = this.s.bands.filter((b) => b.settled && this.hasTech(b, 'railway'));
+    if (towns.length < 2) return;
+    const done = new Map<string, number>();
+    for (const e of this.s.railPairs ?? []) {
+      const [k, v] = e.split(':');
+      done.set(k, Number(v ?? 1));
+    }
+    const alive = new Set(towns.map((b) => b.id));
+    let built = 0;
+    for (const a of this.rng.shuffle([...towns])) {
+      if (built >= 6) break;
+      const near = towns.filter((o) => o !== a && dist(a, o) < 60).sort((p, q) => dist(a, p) - dist(a, q)).slice(0, 2);
+      for (const o of near) {
+        const key = a.id < o.id ? `${a.id}-${o.id}` : `${o.id}-${a.id}`;
+        if (done.has(key)) continue;
+        const ia = idx(Math.round(a.cx), Math.round(a.cy)), io = idx(Math.round(o.cx), Math.round(o.cy));
+        const path = findRoad(this.t, this.roads, ia, io, 20000, 4);
+        done.set(key, path ? 1 : 9);
+        built++;
+        if (!path) continue;
+        for (const i of path) this.setRail(i);
+      }
+    }
+    this.s.railPairs = [...done].filter(([k]) => k.split('-').every((id) => alive.has(Number(id)))).map(([k, v]) => `${k}:${v}`);
   }
 
   // ---------- kingdoms (iron age) ----------
@@ -432,7 +471,7 @@ export class Simulation {
 
   /** the biggest number of people a settled town holds before some leave to found a new village */
   private townLimit(b: Band): number {
-    return this.hasTech(b, 'electricity') ? 900 : this.hasTech(b, 'factory') ? 700 : this.hasTech(b, 'star_fort') ? 420 : this.hasTech(b, 'castle') ? 340
+    return this.hasTech(b, 'fusion') ? 1600 : this.hasTech(b, 'nuclear_power') ? 1200 : this.hasTech(b, 'electricity') ? 900 : this.hasTech(b, 'factory') ? 700 : this.hasTech(b, 'star_fort') ? 420 : this.hasTech(b, 'castle') ? 340
       : this.hasTech(b, 'aqueduct') ? 280 : this.hasTech(b, 'walls') ? 210 : 140;
   }
 
@@ -991,7 +1030,7 @@ export class Simulation {
     if (this.month === 3) this.pairing(members);
     this.bandDynamics(members);
     this.contact();
-    if (this.month === 6) this.buildRoads();
+    if (this.month === 6) { this.buildRoads(); this.buildRails(); }
     if (this.month === 7) this.kingdoms();
     if (this.month === 8) this.growTowns();
     if (this.s.tick % 6 === 0) this.explore();
@@ -1105,7 +1144,7 @@ export class Simulation {
         }
         case 'fish': got = 1.4 * skill * (this.hasTech(b, 'boats') ? 1.3 : 1) * (this.hasTech(b, 'sailing') ? 1.25 : 1) * (this.hasTech(b, 'harbor') ? 1.15 : 1) * (0.7 + season * 0.3); break;
         case 'farm': {
-          farmWant += 2.4 * this.farmSeason() * skill * tool * (this.hasTech(b, 'plough') ? 1.35 : 1) * (this.hasTech(b, 'calendar') ? 1.1 : 1) * (this.hasTech(b, 'watermill') ? 1.12 : 1) * (this.hasTech(b, 'heavy_plough') ? 1.15 : 1) * (this.hasTech(b, 'windmill') ? 1.1 : 1) * (this.hasTech(b, 'potato') ? 1.15 : 1) * (this.hasTech(b, 'fertilizer') ? 1.2 : 1);
+          farmWant += 2.4 * this.farmSeason() * skill * tool * (this.hasTech(b, 'plough') ? 1.35 : 1) * (this.hasTech(b, 'calendar') ? 1.1 : 1) * (this.hasTech(b, 'watermill') ? 1.12 : 1) * (this.hasTech(b, 'heavy_plough') ? 1.15 : 1) * (this.hasTech(b, 'windmill') ? 1.1 : 1) * (this.hasTech(b, 'potato') ? 1.15 : 1) * (this.hasTech(b, 'fertilizer') ? 1.2 : 1) * (this.hasTech(b, 'green_revolution') ? 1.25 : 1) * (this.hasTech(b, 'vertical_farm') ? 1.2 : 1);
           break;
         }
         case 'herd': got = 1.7 * skill; break;
@@ -1244,7 +1283,7 @@ export class Simulation {
       // a first discovery happens somewhere in the world: many bands do not make it come sooner
       const world = seen ? 1 : Math.min(1, 4 / this.s.bands.length);
       const written = (this.hasTech(b, 'alphabet') ? 1.3 : this.hasTech(b, 'writing') ? 1.15 : 1) * (this.hasTech(b, 'library') ? 1.2 : 1)
-        * (this.hasTech(b, 'monastery') ? 1.15 : 1) * (this.hasTech(b, 'university') ? 1.2 : 1) * (this.hasTech(b, 'academy') ? 1.2 : 1) * (this.hasTech(b, 'school') ? 1.2 : 1);
+        * (this.hasTech(b, 'monastery') ? 1.15 : 1) * (this.hasTech(b, 'university') ? 1.2 : 1) * (this.hasTech(b, 'academy') ? 1.2 : 1) * (this.hasTech(b, 'school') ? 1.2 : 1) * (this.hasTech(b, 'computer') ? 1.2 : 1) * (this.hasTech(b, 'ai') ? 1.25 : 1);
       const chance = written * world * GLOBAL_DISCOVERY * Math.sqrt(tech.base / 0.0025) * this.techPace(tech) * again * crowd * Math.pow(g * 2, 2);
       if (!this.rng.chance(chance)) continue;
       this.addTech(b, tech.id);
@@ -1317,7 +1356,7 @@ export class Simulation {
       const winter = this.month === 11 || this.month <= 1;
       const coldRisk = winter && temp < 0.4 ? (0.4 - temp) * (this.hasTech(b, 'clothing') ? 0.15 : 1) * (this.hasTech(b, 'fire') ? 0.4 : 1) * 0.02 : 0;
       const medicine = (this.hasTech(b, 'medicine') ? 0.65 : this.hasTech(b, 'herb_lore') ? 0.8 : 1) * (this.hasTech(b, 'aqueduct') ? 0.85 : 1) * (this.hasTech(b, 'monastery') ? 0.9 : 1) * (this.hasTech(b, 'microscope') ? 0.85 : 1)
-        * (this.hasTech(b, 'antibiotics') ? 0.6 : this.hasTech(b, 'vaccine') ? 0.75 : 1) * (this.hasTech(b, 'sewer') ? 0.85 : 1);
+        * (this.hasTech(b, 'antibiotics') ? 0.6 : this.hasTech(b, 'vaccine') ? 0.75 : 1) * (this.hasTech(b, 'sewer') ? 0.85 : 1) * (this.hasTech(b, 'genome') ? 0.9 : 1) * (this.hasTech(b, 'gene_therapy') ? 0.75 : 1);
       const settledDisease = b.settled ? 1.4 : 1;
       for (const p of m) {
         const a = this.ageOf(p);
@@ -1784,11 +1823,11 @@ export class Simulation {
         const a = bands[i], b = bands[j];
         const d = dist(a, b);
         // horses and carts bring far neighbours together
-        const reach = this.hasTech(a, 'aviation') && this.hasTech(b, 'aviation') ? 100 : (this.hasTech(a, 'railway') || this.hasTech(a, 'automobile')) && (this.hasTech(b, 'railway') || this.hasTech(b, 'automobile')) ? 70 : this.hasTech(a, 'steamship') && this.hasTech(b, 'steamship') ? 60 : this.hasTech(a, 'caravel') && this.hasTech(b, 'caravel') ? 50 : this.hasTech(a, 'post') && this.hasTech(b, 'post') ? 45 : this.hasTech(a, 'compass') && this.hasTech(b, 'compass') ? 38 : this.hasTech(a, 'harbor') && this.hasTech(b, 'harbor') ? 30 : this.hasTech(a, 'horse') || this.hasTech(b, 'horse') ? 24 : 16;
+        const reach = this.hasTech(a, 'jet') && this.hasTech(b, 'jet') ? 160 : this.hasTech(a, 'aviation') && this.hasTech(b, 'aviation') ? 100 : (this.hasTech(a, 'railway') || this.hasTech(a, 'automobile')) && (this.hasTech(b, 'railway') || this.hasTech(b, 'automobile')) ? 70 : this.hasTech(a, 'steamship') && this.hasTech(b, 'steamship') ? 60 : this.hasTech(a, 'caravel') && this.hasTech(b, 'caravel') ? 50 : this.hasTech(a, 'post') && this.hasTech(b, 'post') ? 45 : this.hasTech(a, 'compass') && this.hasTech(b, 'compass') ? 38 : this.hasTech(a, 'harbor') && this.hasTech(b, 'harbor') ? 30 : this.hasTech(a, 'horse') || this.hasTech(b, 'horse') ? 24 : 16;
         if (d > reach && !(a.kingdom != null && b.kingdom != null && (a.kingdom === b.kingdom || this.kingdomOf(a)?.allies?.[b.kingdom] != null))) continue;
         // traders even out a good and a bad harvest between neighbours
         if (this.hasTech(a, 'trade') && this.hasTech(b, 'trade')) {
-          const give = (a.food - b.food) * (this.hasTech(a, 'factory') && this.hasTech(b, 'factory') ? 0.15 : this.hasTech(a, 'banking') && this.hasTech(b, 'banking') ? 0.12 : this.hasTech(a, 'guilds') && this.hasTech(b, 'guilds') ? 0.1 : this.hasTech(a, 'coins') && this.hasTech(b, 'coins') ? 0.08 : 0.05);
+          const give = (a.food - b.food) * (this.hasTech(a, 'internet') && this.hasTech(b, 'internet') ? 0.2 : this.hasTech(a, 'factory') && this.hasTech(b, 'factory') ? 0.15 : this.hasTech(a, 'banking') && this.hasTech(b, 'banking') ? 0.12 : this.hasTech(a, 'guilds') && this.hasTech(b, 'guilds') ? 0.1 : this.hasTech(a, 'coins') && this.hasTech(b, 'coins') ? 0.08 : 0.05);
           a.food -= give;
           b.food += give;
         }
@@ -1808,7 +1847,7 @@ export class Simulation {
           * (this.hasTech(a, 'library') || this.hasTech(b, 'library') ? 1.2 : 1) * (this.hasTech(a, 'theatre') || this.hasTech(b, 'theatre') ? 1.1 : 1)
           * (this.hasTech(a, 'printing') || this.hasTech(b, 'printing') ? 1.6 : this.hasTech(a, 'paper') || this.hasTech(b, 'paper') ? 1.15 : 1)
           * (this.hasTech(a, 'newspaper') || this.hasTech(b, 'newspaper') ? 1.3 : 1) * (this.hasTech(a, 'coffeehouse') || this.hasTech(b, 'coffeehouse') ? 1.1 : 1)
-          * (this.hasTech(a, 'radio') || this.hasTech(b, 'radio') ? 1.5 : 1) * (this.hasTech(a, 'telegraph') && this.hasTech(b, 'telegraph') ? 1.5 : 1);
+          * (this.hasTech(a, 'radio') || this.hasTech(b, 'radio') ? 1.5 : 1) * (this.hasTech(a, 'telegraph') && this.hasTech(b, 'telegraph') ? 1.5 : 1) * (this.hasTech(a, 'television') || this.hasTech(b, 'television') ? 1.3 : 1) * (this.hasTech(a, 'internet') && this.hasTech(b, 'internet') ? 2 : 1);
         for (const tech of a.techs) if (!sb.has(tech) && this.canUse(b, tech) && this.rng.chance(share)) {
           this.addTech(b, tech);
           this.emit('learn', 1, `${this.bandLabel(b, true)} научи „${TECH_BY_ID.get(tech)!.name}“ от ${this.bandLabel(a)}.`, undefined, undefined, b.id, this.bRefs(a),

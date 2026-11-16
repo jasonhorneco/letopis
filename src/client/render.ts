@@ -4,6 +4,7 @@ import {
 import { Simplex } from '../shared/noise';
 import { Fauna } from './animals';
 import { Fleet } from './ships';
+import { Trains } from './trains';
 import { SECRET_KINDS, SecretSpot, secretSpots } from '../shared/secrets';
 import { B, VILLAGE } from './lang';
 import { Rng } from '../shared/rng';
@@ -181,6 +182,9 @@ export class WorldRenderer {
   roadLayer = new Container();
   roads = new Uint8Array(0);
   roadSprites = new Map<number, Sprite>();
+  /** railway tracks, over the roads and the snow */
+  railLayer = new Container();
+  railSprites = new Map<number, Sprite>();
   roadVersion = 0;
   /** what every band knows (tech ids), for the work people show */
   bandTech = new Map<number, Set<string>>();
@@ -229,6 +233,7 @@ export class WorldRenderer {
   camps = new Map<number, CampSprite>();
   fauna = new Fauna(this);
   fleet = new Fleet(this);
+  trains = new Trains(this);
   /** the 100 hidden secrets: tiny, half see-through, buried by snow in winter */
   secrets: { spot: SecretSpot; s: Sprite; i: number; found: boolean }[] = [];
   tex!: Record<string, Texture>;
@@ -282,6 +287,35 @@ export class WorldRenderer {
         for (let i = 10; i > 0; i--) x.circle(40, 40, i * 4).fill({ color: 0xff8a2a, alpha: 0.035 });
       }),
     };
+    // railway tracks, one texture for every way the neighbours can join (same mask as the roads)
+    for (let mask = 0; mask < 16; mask++) {
+      const gr = new Graphics();
+      // to the middle of the edge towards -x, -y, +x, +y
+      const dirs: [number, number, number][] = [[1, -8, -4], [2, 8, -4], [4, 8, 4], [8, -8, 4]];
+      let ends = dirs.filter(([m]) => mask & m);
+      if (!ends.length) ends = dirs.filter(([m]) => m & 10);
+      else if (ends.length === 1) ends = dirs.filter(([m]) => m === ends[0][0] || m === ((ends[0][0] << 2) | (ends[0][0] >> 2)) % 16);
+      for (const [, ex, ey] of ends) {
+        gr.moveTo(0, 0).lineTo(ex, ey).stroke({ width: 4.2, color: 0x7d7264, cap: 'round' });
+      }
+      for (const [, ex, ey] of ends) {
+        // sleepers lie across the track: the other axis, a little shorter
+        const px = -ex, py = ey;
+        const k = 0.28;
+        for (const t of [0.2, 0.55, 0.9]) {
+          const cx = ex * t, cy = ey * t;
+          gr.moveTo(cx - px * k, cy - py * k).lineTo(cx + px * k, cy + py * k).stroke({ width: 1.1, color: 0x6b4a2b });
+        }
+      }
+      for (const side of [-0.17, 0.17]) {
+        for (const [, ex, ey] of ends) {
+          const px = -ex * side, py = ey * side;
+          gr.moveTo(px, py).lineTo(ex + px, ey + py).stroke({ width: 0.7, color: 0xb9c0c6 });
+        }
+      }
+      this.tex[`rail${mask}`] = r.generateTexture({ target: gr, resolution: 3, frame: new Rectangle(-16, -8, 32, 16) });
+      gr.destroy();
+    }
   }
 
   setWorld(info: WorldInfo) {
@@ -311,6 +345,11 @@ export class WorldRenderer {
     this.roadSprites.clear();
     this.roadLayer = new Container();
     this.terrainLayer.addChild(this.roadLayer);
+    this.railSprites.clear();
+    this.railLayer.destroy({ children: true });
+    // the tracks are kept clear of snow, so they lie over it
+    this.railLayer = new Container();
+    this.snowLayer.addChild(this.railLayer);
     this.setupWaterFilter();
   }
 
@@ -583,21 +622,44 @@ export class WorldRenderer {
       if (y > 0) redo.add(i - w);
       if (y < h - 1) redo.add(i + w);
     }
-    for (const i of redo) this.drawRoad(i);
+    for (const i of redo) { this.drawRoad(i); this.drawRail(i); }
     // bushes and stones do not stand on a road
     for (const list of this.objChunks.values()) for (const o of list) if (o.kind === 'other' && !o.isStump && this.roads[o.i]) o.s.visible = false;
     // keep the road sprites in drawing order (back to front)
     this.roadLayer.children.sort((a, b) => a.y - b.y);
+    this.railLayer.children.sort((a, b) => a.y - b.y);
     this.roadVersion++;
+  }
+
+  /** is there a railway on this tile */
+  isRail(x: number, y: number): boolean {
+    const { w, h } = this.info;
+    return x >= 0 && y >= 0 && x < w && y < h && (this.roads[y * w + x] & 4) > 0;
+  }
+
+  private drawRail(i: number) {
+    const { w } = this.info;
+    const old = this.railSprites.get(i);
+    if (!(this.roads[i] & 4)) { if (old) { old.destroy(); this.railSprites.delete(i); } return; }
+    const x = i % w, y = (i - x) / w;
+    const mask = (this.isRail(x - 1, y) ? 1 : 0) | (this.isRail(x, y - 1) ? 2 : 0) | (this.isRail(x + 1, y) ? 4 : 0) | (this.isRail(x, y + 1) ? 8 : 0);
+    const tex = this.tex[`rail${mask}`];
+    if (!tex) return;
+    const s = old ?? new Sprite(tex);
+    s.texture = tex;
+    s.anchor.set(0.5);
+    const p = this.tileTop(x, y);
+    s.position.set(p.x, p.y);
+    if (!old) { this.railLayer.addChild(s); this.railSprites.set(i, s); }
   }
 
   private drawRoad(i: number) {
     const { w } = this.info;
-    const lvl = this.roads[i];
+    const lvl = this.roads[i] & 3;
     const old = this.roadSprites.get(i);
     if (!lvl) { if (old) { old.destroy(); this.roadSprites.delete(i); } return; }
     const x = i % w, y = (i - x) / w;
-    const has = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < w && yy < this.info.h && this.roads[yy * w + xx] > 0;
+    const has = (xx: number, yy: number) => xx >= 0 && yy >= 0 && xx < w && yy < this.info.h && (this.roads[yy * w + xx] & 3) > 0;
     // 1 upper-left (-x), 2 upper-right (-y), 4 lower-right (+x), 8 lower-left (+y)
     const mask = (has(x - 1, y) ? 1 : 0) | (has(x, y - 1) ? 2 : 0) | (has(x + 1, y) ? 4 : 0) | (has(x, y + 1) ? 8 : 0);
     let name = `road${lvl}_${mask || 5}`;
@@ -888,6 +950,7 @@ export class WorldRenderer {
     if (this.info) this.updateCleared();
     this.fauna.updateBands(bands);
     this.fleet.updateBands(bands);
+    this.trains.updateBands(bands);
     this.updateRealms(bands);
   }
 
@@ -1221,6 +1284,7 @@ export class WorldRenderer {
     }
     this.fauna.frame(performance.now(), Math.min(0.1, dt / 60));
     this.fleet.frame(performance.now(), Math.min(0.1, dt / 60));
+    this.trains.frame(performance.now(), Math.min(0.1, dt / 60));
     this.secretFrame(nowMs, zoom, winter);
   }
 }
