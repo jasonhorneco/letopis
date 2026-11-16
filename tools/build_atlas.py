@@ -399,6 +399,34 @@ group('kickscooter', cells('CJ', (3,)), 'pose', PEOPLE_WPP, 0)
 group('courier', cells('CJ', (4,)), 'pose', PEOPLE_WPP, 0)
 group('ogwalk', cells('CK', (1, 2)), 'person', 13.6, 64)
 group('ogidle', cells('CK', (3, 4)), 'person', 13.6, 64)
+# space age (CL props, CM green tower/spaceport/plants, CN town, CO maglev, flying cars, rockets, CP workers, CQ travellers, CR ranger)
+for cid, name, w in (('CL11', 'hoverscooter', 0.05), ('CL12', 'gardendome', 0.065), ('CL13', 'drone', 0.045), ('CL14', 'robodog', 0.04),
+                     ('CL21', 'rover', 0.055), ('CL22', 'planttower', 0.06), ('CL23', 'solartree', 0.06), ('CL24', 'spacesuit', 0.045),
+                     ('CL31', 'hydrocrate', 0.06), ('CL32', 'chargepad', 0.05), ('CL33', 'airpillar', 0.045), ('CL34', 'scope2', 0.045),
+                     ('CL41', 'wavebench', 0.055), ('CL42', 'gardenbot', 0.05), ('CL43', 'watertank', 0.055), ('CL44', 'futlamp', 0.035),
+                     ('CM31', 'fusion', 0.1), ('CM32', 'elevator', 0.09), ('CM33', 'vfarm', 0.09), ('CM34', 'rocketpad', 0.085),
+                     ('CM41', 'maglevbeam', 0.07), ('CM42', 'maglevcurve', 0.07), ('CM43', 'maglevstation', 0.09), ('CM44', 'domehouse', 0.09),
+                     ('CN21', 'roundhouse', 0.085), ('CN22', 'school3', 0.095), ('CN23', 'medcenter', 0.095), ('CN24', 'glassmarket2', 0.095),
+                     ('CN31', 'observatory2', 0.09), ('CN32', 'spacemuseum', 0.095), ('CN33', 'park2', 0.09), ('CN34', 'windtower', 0.07),
+                     ('CN41', 'robotshop', 0.09), ('CN42', 'skyport', 0.095), ('CN43', 'cafe3', 0.09), ('CN44', 'starmonument', 0.07),
+                     ('CO41', 'cargodrone', 0.06), ('CO42', 'airship', 0.1), ('CO43', 'pod', 0.05), ('CO44', 'starship', 0.12)):
+    group(name, cid, 'thing', w, 0)
+group('arcob', cells('CM', (1,)), 'thing', 0.1, 0)        # 0..3: green tower with gardens
+group('spaceportb', cells('CM', (2,)), 'thing', 0.12, 0)  # 0..3: spaceport
+group('ecob', cells('CN', (1,)), 'thing', 0.095, 0)       # 0..3: terraced eco apartments
+group('maglev', cells('CO', (1,)), 'thing', 0.09, 0)      # 4 frames
+group('flycar', cells('CO', (2,)), 'thing', 0.055, 0)     # 4 frames
+group('launch', cells('CO', (3,)), 'thing', 0.085, 0)     # 4 frames: a rocket lifts off
+group('technician', cells('CP', (1,)), 'pose', PEOPLE_WPP, 0)
+group('botanist', cells('CP', (2,)), 'pose', PEOPLE_WPP, 0)
+group('engineer', cells('CP', (3,)), 'pose', PEOPLE_WPP, 0)
+group('astronaut', cells('CP', (4,)), 'pose', PEOPLE_WPP, 0)
+group('robodogwalk', cells('CQ', (1,)), 'pose', PEOPLE_WPP, 0)
+group('hoverride', cells('CQ', (2,)), 'pose', PEOPLE_WPP, 0)
+group('dronekid', cells('CQ', (3,)), 'pose', PEOPLE_WPP, 0)
+group('eldercouple', cells('CQ', (4,)), 'pose', PEOPLE_WPP, 0)
+group('rgwalk', cells('CR', (1, 2)), 'person', 13.6, 64)
+group('rgidle', cells('CR', (3, 4)), 'person', 13.6, 64)
 # everyday clothes of each age (sheets BS-CD, two per age: adults, then children and more poses); prefix e<era>
 for pre, a, b in (('e2', 'BS', 'BT'), ('e4', 'BU', 'BV'), ('e5', 'BW', 'BX'), ('e6', 'BY', 'BZ'), ('e7', 'CA', 'CB'), ('e8', 'CC', 'CD')):
     group(pre + 'walk', cells(a, (1,)), 'person', 11, 64)
@@ -617,6 +645,13 @@ def main() -> int:
                 items.append((name, img, 0.5, ay, s))
                 items.append((name + '_t', top_only(img, ay * h), 0.5, ay, s))
                 continue
+            if (kind == 'person' and cid[:2] in ('CA', 'CB', 'CC', 'CD', 'CR')) or (kind == 'pose' and cid[:2] in ('CP', 'CQ')):
+                # today and the future: white clothes stay white, only the collar takes the clan colour
+                kid = cid[:2] in ('CB', 'CD') and cid[2] in '123'
+                base, cloth = split_cloth(img, 0.36 if kid else 0.25, upto=0.47 if kid else 0.36)
+                items.append((name, base, 0.5, ay, s))
+                items.append((name + '_c', cloth, 0.5, ay, s))
+                continue
             if kind == 'pose' and cid[:2] in ('AB', 'AC', 'AD', 'AE'):
                 # sleeping people lie down (no head on top); the storyteller's long beard reaches half way down
                 head = 0 if cid[:3] in ('AC1', 'AC2') else 0.55 if cid[:2] == 'AD' else 0.3
@@ -637,13 +672,7 @@ def main() -> int:
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))
                 continue
-            if kind == 'person' and cid[:2] in ('CA', 'CB', 'CC', 'CD'):
-                # today and the future: white clothes stay white, only the collar takes the clan colour
-                kid = cid[:2] in ('CB', 'CD') and cid[2] in '123'
-                base, cloth = split_cloth(img, 0.36 if kid else 0.25, upto=0.47 if kid else 0.36)
-                items.append((name, base, 0.5, ay, s))
-                items.append((name + '_c', cloth, 0.5, ay, s))
-            elif kind in ('person', 'cloth'):
+            if kind in ('person', 'cloth'):
                 base, cloth = split_cloth(img, head=0.48 if cid == 'I13' else 1.0 if (cid[0] in 'STUV' and cid[1].isdigit()) else 0.3 if kind == 'person' else 0)
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))

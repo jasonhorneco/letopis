@@ -1493,6 +1493,13 @@ export class PersonSprite {
       // bronze age: some men ride, some take a cart to the neighbours
       if (man && knows('horse') && hash(this.id, 53) < 0.2) return loop('rider', 4, 160);
       // information age: joggers, people looking at their phones, children on kick scooters, couriers
+      // space age: robot dogs, hover scooters, children with toy drones, old couples hand in hand
+      if (knows('moon_base')) {
+        if (this.female && this.age >= 16 && this.age < 56 && knows('ai') && hash(this.id, 141) < 0.12) { const c = loop('robodogwalk', 4, 180); if (c) return c; }
+        if (man && knows('flying_car') && hash(this.id, 143) < 0.1) { const c = loop('hoverride', 4, 160); if (c) return c; }
+        if (this.age >= 6 && this.age < 14 && hash(this.id, 145) < 0.35) { const c = loop('dronekid', 4, 180); if (c) return c; }
+        if (this.age > 60 && hash(this.id, 147) < 0.2) { const c = loop('eldercouple', 4, 220); if (c) return c; }
+      }
       if (knows('computer')) {
         if (man && this.age < 45 && hash(this.id, 121) < 0.1) { const c = loop('jogger', 4, 120); if (c) return c; }
         if (this.age >= 14 && this.age < 50 && knows('smartphone') && hash(this.id, 123) < 0.15) { const c = loop('phonewalk', 4, 180); if (c) return c; }
@@ -1543,6 +1550,12 @@ export class PersonSprite {
       case 'gather': return this.female && this.age < 56 ? loop('pick', 4, 340) : null;
       case 'fish': return !this.female ? loop('spearfish', 4, 340) : null;
       case 'craft':
+        if (knows('moon_base')) {
+          if (knows('robots') && hash(this.id, 151) < 0.25) { const c = loop('technician', 4, 500); if (c) return c; }
+          if (this.female && knows('vertical_farm') && hash(this.id, 153) < 0.4) { const c = loop('botanist', 4, 500); if (c) return c; }
+          if (hash(this.id, 155) < 0.25) { const c = loop('engineer', 4, 600); if (c) return c; }
+          if (this.age < 45 && hash(this.id, 157) < 0.25) { const c = loop('astronaut', 4, 600); if (c) return c; }
+        }
         if (knows('computer')) {
           if (knows('antibiotics') && hash(this.id, 131) < 0.12) { const c = loop('doctor', 4, 600); if (c) return c; }
           if (hash(this.id, 133) < 0.3) { const c = loop('programmer', 4, 700); if (c) return c; }
@@ -1577,6 +1590,7 @@ export class PersonSprite {
   /** guards (and the bodyguard) wear the best gear of their time: bronze once the band knows it */
   private guardKit(): string {
     const t = this.r.bandTech.get(this.band);
+    if (t?.has('moon_base') && this.r.atlas.has('rgwalk0')) return 'rg';
     if (t?.has('computer') && this.r.atlas.has('ogwalk0')) return 'og';
     if (t?.has('steam_engine') && this.r.atlas.has('wgwalk0')) return 'wg';
     if ((t?.has('star_fort') || t?.has('caravel')) && this.r.atlas.has('pgwalk0')) return 'pg';
@@ -1830,7 +1844,26 @@ const PROPS: [string, string, boolean | null][] = [
   ['solar_power', 'solarpanel', true],
   ['solar_power', 'windturbine', true],
   ['electric_car', 'charger', true],
+  // space age (sheet CL)
+  ['moon_base', 'spacesuit', true],
+  ['moon_base', 'scope2', true],
+  ['moon_base', 'futlamp', true],
+  ['moon_base', 'wavebench', true],
+  ['vertical_farm', 'hydrocrate', true],
+  ['vertical_farm', 'gardendome', true],
+  ['vertical_farm', 'planttower', true],
+  ['maglev', 'chargepad', true],
+  ['fusion', 'watertank', true],
+  ['ai', 'robodog', true],
+  ['ai', 'drone', true],
+  ['ai', 'gardenbot', true],
+  ['rewilding', 'airpillar', true],
+  ['rewilding', 'solartree', true],
+  ['flying_car', 'hoverscooter', true],
+  ['mars_colony', 'rover', true],
 ];
+/** what the space age replaces: the things of the information age */
+const SPACE_DROPS = new Set(['pcdesk', 'trafficlight', 'busstop', 'postbox', 'parkbench2', 'tvset', 'satdish', 'vending', 'recycling', 'scooter', 'phonebox', 'kiosk', 'solarpanel', 'windturbine', 'charger', 'tractor']);
 /** what the information age replaces: steam engines, gas lamps, gramophones and the first motor cars */
 const MODERN_DROPS = new Set(['steamengine', 'coalcart', 'balloon0', 'powerloom', 'girders', 'gaslamp', 'docbag', 'loco0', 'carriage', 'signal', 'bench', 'telegraph', 'camera', 'churns', 'pump', 'bulbs', 'motorcar', 'gramophone', 'globe', 'telescope', 'microscope', 'bfountain']);
 /** what the industrial age replaces: the early modern workshops, carts and chairs */
@@ -2006,6 +2039,8 @@ export class CampSprite {
     if (industrial) props = props.filter((p) => !INDUSTRIAL_DROPS.has(p));
     const modern = industrial && techs.has('computer') && this.r.atlas.has('blockb3');
     if (modern) props = props.filter((p) => !MODERN_DROPS.has(p));
+    const space = modern && techs.has('moon_base') && this.r.atlas.has('ecob3');
+    if (space) props = props.filter((p) => !SPACE_DROPS.has(p));
     // a young colony over the sea: a wooden fort, log cabins, the flag and a jetty
     const colony = !!b.colony && b.dwelling === 'house' && b.size < 80 && this.r.atlas.has('logcabin');
     if (colony) props = ['colflag', 'jetty', ...props.filter((p) => !WALL_PROPS.has(p))];
@@ -2025,6 +2060,7 @@ export class CampSprite {
     const cold = this.r.tempAt(b.x, b.y) < 0.35;
     const tkind = `${b.dwelling}${town ? 'T' : ''}${town && iron ? `I${capital ? 'K' : ''}${techs.has('theatre') ? 'h' : ''}${techs.has('library') ? 'l' : ''}` : ''}`
       + `${town && medieval ? `M${techs.has('castle') ? 'c' : ''}${techs.has('gothic') ? 'g' : ''}${techs.has('monastery') ? 'm' : ''}` : ''}`
+      + `${town && space ? `S${['railway', 'fusion', 'vertical_farm', 'space_elevator', 'flying_car', 'maglev'].map((t) => (techs.has(t) ? t[0] : '')).join('')}` : ''}`
       + `${town && modern ? `N${['jet', 'television', 'nuclear_power', 'rocket', 'automobile', 'school'].map((t) => (techs.has(t) ? t[0] : '')).join('')}${b.size > 300 ? 'B' : ''}` : ''}`
       + `${town && industrial ? `X${['factory', 'railway', 'school', 'vaccine', 'electricity', 'academy', 'theatre'].map((t) => (techs.has(t) ? t[0] : '')).join('')}` : ''}`
       + `${town && early ? `E${['palace', 'telescope', 'banking', 'coffeehouse', 'newspaper', 'post'].map((t) => (techs.has(t) ? t[0] : '')).join('')}` : ''}${colony ? 'C' : ''}`;
@@ -2049,7 +2085,27 @@ export class CampSprite {
         case 'hut': name = A.has('hutb3') ? 'hutb3' : 'roundhut'; break;
         default:
           if (colony) name = k === 0 ? 'colfort' : 'logcabin';
-          else if (town && modern) {
+          else if (town && space) {
+            // terraced green houses and towers full of gardens round the spaceport, the observatory and the vertical farm
+            const big = b.size > 300;
+            if (k === 0) name = capital || big ? 'arcob3' : 'ecob3';
+            else if (k === 1) name = 'glassmarket2';
+            else if (k === 2 && techs.has('railway')) name = 'maglevstation';
+            else if (k === 3) name = 'school3';
+            else if (k === 4) name = 'medcenter';
+            else if (k === 5) name = techs.has('fusion') ? 'fusion' : 'windtower';
+            else if (k === 6) name = 'observatory2';
+            else if (k === 7) name = 'spacemuseum';
+            else if (k === 8) name = capital || big ? 'spaceportb3' : 'park2';
+            else if (k === 9 && techs.has('vertical_farm')) name = 'vfarm';
+            else if (k === 10) name = techs.has('space_elevator') && capital ? 'elevator' : 'robotshop';
+            else if (k === 11) name = 'cafe3';
+            else if (k === 12 && techs.has('flying_car')) name = 'skyport';
+            else if (k === 13) name = 'starmonument';
+            else if (k === 14) name = 'park2';
+            else if (k === 15 && capital) name = 'rocketpad';
+            else name = h < 0.4 ? 'ecob3' : h < 0.65 ? 'roundhouse' : h < 0.8 ? 'domehouse' : big && h < 0.9 ? 'arcob3' : 'windtower';
+          } else if (town && modern) {
             // apartment blocks, offices and glass towers round the hospital, the school, the cinema and the station
             const big = b.size > 300;
             if (k === 0) name = capital || big ? 'skyscraperb3' : 'office';
@@ -2118,7 +2174,7 @@ export class CampSprite {
       s.position.set(q.x, q.y);
       s.zIndex = s.y;
       this.homes.addChild(s);
-      if (k >= builtBefore && /^(hut|house|town|temple|villa|palace|theatre|school|keep|church|timber|abbey|baroque|observ|brick|flats|factory|station|skyscraper|airport|block)b3$/.test(name)) {
+      if (k >= builtBefore && /^(hut|house|town|temple|villa|palace|theatre|school|keep|church|timber|abbey|baroque|observ|brick|flats|factory|station|skyscraper|airport|block|arco|spaceport|eco)b3$/.test(name)) {
         this.building.push({ s, base: name.slice(0, -1), t0: Date.now(), flip: s.scale.x < 0 });
         A.set(s, `${name.slice(0, -1)}0`);
         if (h < 0.5) s.scale.x *= -1;
