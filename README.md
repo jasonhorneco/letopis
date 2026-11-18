@@ -23,6 +23,7 @@ while nobody is watching.
 - "While you were away": the highlights since your last visit.
 - Tour mode: the camera wanders the world by itself and stops where something happens. Nice on a TV.
 - 100 tiny secrets hidden around every world.
+- 200 famous people of real history, from Imhotep to Steve Jobs, are born into the world in the year they were born and leave at the age they died. A red star marks them, and the inventors among them make their own discoveries.
 
 ## Pace
 

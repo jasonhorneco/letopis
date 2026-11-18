@@ -4,7 +4,8 @@ import {
   BandView, ChronicleEntry, Discovery, FamilyTree, GoneBand, TreeNode, PersonDetail, PersonRow, SnapshotMessage, TASKS, TASK_NAMES, TickMessage, WorldInfo, b64decode,
 } from '../shared/types';
 import { SECRET_COUNT, SecretFind, SecretSpot } from '../shared/secrets';
-import { ERAS_BG, ERAS_EN, TECH_DESC, TECH_LIST } from '../shared/i18n';
+import { FAMOUS, Famous, famousByName, fameRole } from '../shared/famous';
+import { ERAS_BG, ERAS_EN, ERA_GATE, TECH_DESC, TECH_LIST } from '../shared/i18n';
 import { ERAS_DE, TECH_DESC_DE, bandTextCaseDe } from '../shared/i18n-de';
 import { isWoman } from '../shared/people-l10n';
 import type { Lang } from '../shared/i18n';
@@ -194,6 +195,8 @@ function applyTime(t: TickMessage['time'], population: number) {
   $('#year').textContent = fmtYear(t.year);
   $('#month').textContent = monthName(t.month);
   $('#era').textContent = ERA(t.eraName);
+  const gate = TECH_LIST.find(([id]) => id === ERA_GATE[t.era + 1]);
+  $('#nextEra').textContent = gate ? `${T('следва', 'next', 'als Nächstes')}: ${TECH_ID(gate[0], gate[1])}` : '';
   $('#pop').textContent = num(population);
   $('#bandsCount').textContent = String(bands.length);
   const days = (Date.now() - t.startedAt) / 86400000;
@@ -265,6 +268,13 @@ function connect() {
 
 // ---------- chronicle ----------
 
+/** "поет, 1850 – 1921" in the language of the page; "ок." for dates that are only known roughly */
+function FAME_LINE(f: Famous): string {
+  const role = fameRole(f, EN ? 'en' : DE ? 'de' : 'bg');
+  const c = f.approx ? T('ок. ', 'c. ', 'um ') : '';
+  return `${role[0].toUpperCase()}${role.slice(1)} · ${c}${fmtYear(f.born)} – ${c}${fmtYear(f.died)}`;
+}
+
 function evText(e: ChronicleEntry): string {
   const src = (EN && e.en) || (DE && (e.de ?? e.en)) || e;
   return kids && src.kids ? src.kids : src.text;
@@ -297,12 +307,12 @@ function linkedText(e: ChronicleEntry): string {
     out += `<a href="#" class="ref" ${attr}>${esc(text.slice(t.a, t.z))}</a>`;
     at = t.z;
   }
-  return out + esc(text.slice(at));
+  return (out + esc(text.slice(at))).replace(/★/g, '<span class="fame-star">★</span>');
 }
 
 function eventHtml(e: ChronicleEntry): string {
   const icon: Record<string, string> = {
-    discovery: '💡', rediscovery: '🔁', settle: '🏘️', colony: '🏘️', split: '🚶', death: '🕯️', twins: '👶', hunt: '🦣',
+    famous: '🌟', discovery: '💡', rediscovery: '🔁', settle: '🏘️', colony: '🏘️', split: '🚶', death: '🕯️', twins: '👶', hunt: '🦣',
     winter: '❄️', secret: '✨', drought: '☀️', extinct: '🌑', lost: '📜', meet: '🤝', learn: '📚', era: '⭐', milestone: '👥', genesis: '🌅', merge: '🔗', marriage: '💞', end: '🌑', kingdom: '👑', spring: '🌸', flood: '🌊', locusts: '🦗', harvest: '🌾', feast: '🎉', wedding: '💍',
   };
   return `<li class="ev imp${e.importance}">
@@ -400,6 +410,23 @@ function renderSide() {
         : `<p class="muted">${T('Още никой не е направил нещо велико. Търпение.', 'Nobody has done anything great yet. Patience.', 'Noch hat niemand etwas Großes vollbracht. Geduld.')}</p>`;
     }).catch(() => {
       if (activeTab === 'heroes') body.innerHTML = `<p class="muted">${T('Не успях да заредя личностите. Опитай пак след малко.', 'Could not load the people. Try again in a moment.', 'Die Personen konnten nicht geladen werden. Versuch es gleich noch einmal.')}</p>`;
+    });
+  } else if (activeTab === 'famous') {
+    api<{ i: number; id: number; band: string; died?: number }[]>('/api/famous').then((born) => {
+      if (activeTab !== 'famous') return;
+      const at = new Map(born.map((b) => [b.i, b]));
+      // like the secrets: a name shows only once the person is born in this world
+      body.innerHTML = `<p class="muted">${T(`Родени ${born.length} от ${FAMOUS.length}. Известни хора от истинската история идват на света в годината, в която са се родили, и си отиват на годините, на които са починали. Отбелязани са с червена звезда.`,
+        `Born ${born.length} of ${FAMOUS.length}. Famous people of the real world come into it in the year they were born and leave at the age they died. A red star marks them.`,
+        `${born.length} von ${FAMOUS.length} geboren. Berühmte Menschen aus der echten Welt kommen im Jahr ihrer Geburt zur Welt und gehen in dem Alter, in dem sie gestorben sind. Ein roter Stern zeigt sie.`)}</p>
+        <ol class="secrets famous">${FAMOUS.map((f, k) => {
+          const b = at.get(k);
+          if (!b) return `<li>${T('Предстои', 'Yet to come', 'Kommt noch')}</li>`;
+          return `<li class="found" data-person="${b.id}"><span class="fame-star">★</span> <b>${esc(P(f.bg))}</b>${b.died === undefined ? ` <span class="alive">${T('жив', 'alive', 'lebt')}</span>` : ''}
+            <div class="muted">${esc(FAME_LINE(f))} · ${esc(BL(b.band))}</div></li>`;
+        }).join('')}</ol>`;
+    }).catch(() => {
+      if (activeTab === 'famous') body.innerHTML = `<p class="muted">${T('Не успях да заредя личностите. Опитай пак след малко.', 'Could not load the people. Try again in a moment.', 'Die Personen konnten nicht geladen werden. Versuch es gleich noch einmal.')}</p>`;
     });
   } else if (activeTab === 'stats') {
     renderStats(body);
@@ -551,6 +578,7 @@ async function showPerson(id: number) {
   if (!d) return;
   // the first people have no parents: the world starts with them
   const link = (p: { id: number; name: string } | null) => (p ? `<a href="#" data-person="${p.id}">${esc(P(p.name))}</a>` : `<span class="muted">${d.generation <= 1 ? T('от първите хора', 'one of the first people', 'aus der ersten Generation') : T('неизвестен', 'unknown', 'unbekannt')}</span>`);
+  const fam = famousByName(d.name);
   const genes = Object.entries(d.genes).map(([k, v]) => `<div class="gene"><span>${esc(GENE(k))}</span><div class="bar"><i style="width:${v}%"></i></div></div>`).join('');
   const alive = d.diedYear === null;
   // someone at home (not drawn) steps out to be followed
@@ -560,7 +588,8 @@ async function showPerson(id: number) {
   if (live && alive) { stopTour(); follow = id; r.select(id); cam.tz = Math.max(cam.tz, 2); }
   openCard(`
     <div class="person-head"><div class="avatar ${d.sex ? 'f' : 'm'}">${d.sex ? '👩' : '👨'}</div>
-      <div><h2>${esc(P(d.name))}</h2>
+      <div><h2>${fam ? '<span class="fame-star">★</span> ' : ''}${esc(P(d.name))}</h2>
+      ${fam ? `<div class="title">${esc(FAME_LINE(fam))}</div>` : ''}
       <div class="muted">${alive ? `<span id="pAge">${d.age}</span> ${T('години', 'years', 'Jahre')} · ${esc(BL(d.bandName))}` : `${fmtYear(d.bornYear)} – ${fmtYear(d.diedYear!)}, ${esc(CAUSE(d.cause ?? '', d.age))}`}</div>
       ${d.title ? `<div class="title">${esc(TITLE(d.title, d.sex === 1))}</div>` : ''}
       ${alive && d.task ? `<div>${T('Сега', 'Now', 'Gerade:')} ${esc(TASK(r.nightTask(id) ?? d.task))}</div>` : ''}<div class="muted">${T(`${d.generation}-о поколение`, `generation ${d.generation}`, `${d.generation}. Generation`)}</div></div></div>

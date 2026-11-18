@@ -1,0 +1,290 @@
+// Famous people of the real world. Each is born in a band of the world in the year they were born in reality
+// and dies at the age they died at. Names in the three languages of the page.
+
+export type FameRole =
+  | 'ruler' | 'general' | 'statesman' | 'religion' | 'saint' | 'philosopher' | 'scientist' | 'mathematician' | 'inventor' | 'engineer'
+  | 'physician' | 'nurse' | 'writer' | 'poet' | 'playwright' | 'historian' | 'composer' | 'singer' | 'painter' | 'architect' | 'explorer'
+  | 'revolutionary' | 'activist' | 'actor' | 'animator' | 'astronaut' | 'athlete' | 'seer' | 'teacher' | 'entrepreneur';
+
+/** [bg m, bg f, en, de m, de f] */
+export const FAME_ROLE: Record<FameRole, [string, string, string, string, string]> = {
+  ruler: ['владетел', 'владетелка', 'ruler', 'Herrscher', 'Herrscherin'],
+  general: ['пълководец', 'пълководка', 'general', 'Feldherr', 'Feldherrin'],
+  statesman: ['държавник', 'държавничка', 'statesman', 'Staatsmann', 'Staatsfrau'],
+  religion: ['основател на вяра', 'основателка на вяра', 'founder of a faith', 'Religionsstifter', 'Religionsstifterin'],
+  saint: ['светец', 'светица', 'saint', 'Heiliger', 'Heilige'],
+  philosopher: ['философ', 'философка', 'philosopher', 'Philosoph', 'Philosophin'],
+  scientist: ['учен', 'учена', 'scientist', 'Wissenschaftler', 'Wissenschaftlerin'],
+  mathematician: ['математик', 'математичка', 'mathematician', 'Mathematiker', 'Mathematikerin'],
+  inventor: ['изобретател', 'изобретателка', 'inventor', 'Erfinder', 'Erfinderin'],
+  engineer: ['инженер', 'инженерка', 'engineer', 'Ingenieur', 'Ingenieurin'],
+  physician: ['лекар', 'лекарка', 'physician', 'Arzt', 'Ärztin'],
+  nurse: ['медицински брат', 'медицинска сестра', 'nurse', 'Krankenpfleger', 'Krankenschwester'],
+  writer: ['писател', 'писателка', 'writer', 'Schriftsteller', 'Schriftstellerin'],
+  poet: ['поет', 'поетеса', 'poet', 'Dichter', 'Dichterin'],
+  playwright: ['драматург', 'драматург', 'playwright', 'Dramatiker', 'Dramatikerin'],
+  historian: ['историк', 'историчка', 'historian', 'Geschichtsschreiber', 'Geschichtsschreiberin'],
+  composer: ['композитор', 'композиторка', 'composer', 'Komponist', 'Komponistin'],
+  singer: ['певец', 'певица', 'singer', 'Sänger', 'Sängerin'],
+  painter: ['художник', 'художничка', 'painter', 'Maler', 'Malerin'],
+  architect: ['архитект', 'архитектка', 'architect', 'Baumeister', 'Baumeisterin'],
+  explorer: ['пътешественик', 'пътешественичка', 'explorer', 'Entdecker', 'Entdeckerin'],
+  revolutionary: ['революционер', 'революционерка', 'revolutionary', 'Revolutionär', 'Revolutionärin'],
+  activist: ['борец за права', 'борец за права', 'civil rights activist', 'Bürgerrechtler', 'Bürgerrechtlerin'],
+  actor: ['актьор', 'актриса', 'actor', 'Schauspieler', 'Schauspielerin'],
+  animator: ['аниматор', 'аниматорка', 'animator', 'Trickfilmzeichner', 'Trickfilmzeichnerin'],
+  astronaut: ['космонавт', 'космонавтка', 'astronaut', 'Raumfahrer', 'Raumfahrerin'],
+  athlete: ['спортист', 'спортистка', 'athlete', 'Sportler', 'Sportlerin'],
+  seer: ['пророк', 'пророчица', 'seer', 'Seher', 'Seherin'],
+  teacher: ['духовен учител', 'духовна учителка', 'spiritual teacher', 'spiritueller Lehrer', 'spirituelle Lehrerin'],
+  entrepreneur: ['предприемач', 'предприемачка', 'entrepreneur', 'Unternehmer', 'Unternehmerin'],
+};
+
+export interface Famous {
+  bg: string;
+  en: string;
+  de: string;
+  /** year of birth (negative = BC) */
+  born: number;
+  /** age at death */
+  age: number;
+  /** year of death (the birthday had not come yet in that year when it is born + age + 1) */
+  died: number;
+  sex: 0 | 1;
+  role: FameRole;
+  /** especially known to people who speak this language */
+  loc?: 'bg' | 'en' | 'de';
+  /** the discovery this person made: they make it in the world too, when they can */
+  tech?: string;
+  /** dates are approximate or traditional */
+  approx?: boolean;
+}
+
+type Row = [string, string, string, number, number, 0 | 1, FameRole, ('bg' | 'en' | 'de' | '')?, string?, boolean?];
+const A = true;
+
+const ROWS: Row[] = [
+  ['Имхотеп', 'Imhotep', 'Imhotep', -2650, 50, 0, 'architect', '', undefined, A],
+  ['Хамурапи', 'Hammurabi', 'Hammurabi', -1810, 60, 0, 'ruler', '', undefined, A],
+  ['Моисей', 'Moses', 'Mose', -1391, 120, 0, 'religion', '', undefined, A],
+  ['Нефертити', 'Nefertiti', 'Nofretete', -1370, 40, 1, 'ruler', '', undefined, A],
+  ['Тутанкамон', 'Tutankhamun', 'Tutanchamun', -1341, 18, 0, 'ruler', '', undefined, A],
+  ['Рамзес II', 'Ramesses II', 'Ramses II.', -1303, 90, 0, 'ruler', '', undefined, A],
+  ['Цар Давид', 'King David', 'König David', -1040, 70, 0, 'ruler', '', undefined, A],
+  ['Цар Соломон', 'King Solomon', 'König Salomo', -990, 59, 0, 'ruler', '', undefined, A],
+  ['Солон', 'Solon', 'Solon', -638, 80, 0, 'statesman', '', 'laws', A],
+  ['Сафо', 'Sappho', 'Sappho', -630, 60, 1, 'poet', '', undefined, A],
+  ['Езоп', 'Aesop', 'Äsop', -620, 56, 0, 'writer', '', undefined, A],
+  ['Питагор', 'Pythagoras', 'Pythagoras', -570, 75, 0, 'mathematician', '', undefined, A],
+  ['Буда', 'Buddha', 'Buddha', -563, 80, 0, 'religion', '', undefined, A],
+  ['Конфуций', 'Confucius', 'Konfuzius', -551, 72, 0, 'philosopher', '', undefined, A],
+  ['Есхил', 'Aeschylus', 'Aischylos', -525, 69, 0, 'playwright', '', 'theatre', A],
+  ['Софокъл', 'Sophocles', 'Sophokles', -497, 91, 0, 'playwright', '', undefined, A],
+  ['Перикъл', 'Pericles', 'Perikles', -495, 66, 0, 'statesman', '', undefined, A],
+  ['Херодот', 'Herodotus', 'Herodot', -484, 59, 0, 'historian', '', undefined, A],
+  ['Сократ', 'Socrates', 'Sokrates', -470, 71, 0, 'philosopher', '', undefined, A],
+  ['Хипократ', 'Hippocrates', 'Hippokrates', -460, 90, 0, 'physician', '', 'medicine', A],
+  ['Демокрит', 'Democritus', 'Demokrit', -460, 90, 0, 'philosopher', '', undefined, A],
+  ['Платон', 'Plato', 'Platon', -428, 80, 0, 'philosopher', '', undefined, A],
+  ['Аристотел', 'Aristotle', 'Aristoteles', -384, 62, 0, 'philosopher'],
+  ['Александър Македонски', 'Alexander the Great', 'Alexander der Große', -356, 32, 0, 'ruler'],
+  ['Евклид', 'Euclid', 'Euklid', -325, 60, 0, 'mathematician', '', undefined, A],
+  ['Ашока', 'Ashoka', 'Ashoka', -304, 72, 0, 'ruler', '', undefined, A],
+  ['Архимед', 'Archimedes', 'Archimedes', -287, 75, 0, 'mathematician', '', undefined, A],
+  ['Цин Шихуанди', 'Qin Shi Huang', 'Qin Shihuangdi', -259, 49, 0, 'ruler'],
+  ['Ханибал', 'Hannibal', 'Hannibal', -247, 64, 0, 'general', '', undefined, A],
+  ['Спартак', 'Spartacus', 'Spartacus', -111, 40, 0, 'revolutionary', '', undefined, A],
+  ['Цицерон', 'Cicero', 'Cicero', -106, 63, 0, 'statesman'],
+  ['Юлий Цезар', 'Julius Caesar', 'Julius Caesar', -100, 55, 0, 'general'],
+  ['Вергилий', 'Virgil', 'Vergil', -70, 50, 0, 'poet'],
+  ['Клеопатра', 'Cleopatra', 'Kleopatra', -69, 39, 1, 'ruler'],
+  ['Октавиан Август', 'Augustus', 'Augustus', -63, 75, 0, 'ruler'],
+  ['Исус Христос', 'Jesus Christ', 'Jesus Christus', -4, 33, 0, 'religion', '', undefined, A],
+  ['Апостол Павел', 'Paul the Apostle', 'Apostel Paulus', 5, 60, 0, 'saint', '', undefined, A],
+  ['Нерон', 'Nero', 'Nero', 37, 30, 0, 'ruler'],
+  ['Птолемей', 'Ptolemy', 'Ptolemäus', 100, 70, 0, 'scientist', '', undefined, A],
+  ['Марк Аврелий', 'Marcus Aurelius', 'Mark Aurel', 121, 58, 0, 'ruler'],
+  ['Константин Велики', 'Constantine the Great', 'Konstantin der Große', 272, 65, 0, 'ruler', '', undefined, A],
+  ['Свети Августин', 'Augustine of Hippo', 'Augustinus von Hippo', 354, 75, 0, 'saint'],
+  ['Хипатия', 'Hypatia', 'Hypatia', 360, 55, 1, 'mathematician', '', undefined, A],
+  ['Атила', 'Attila', 'Attila', 406, 47, 0, 'ruler', '', undefined, A],
+  ['Юстиниан I', 'Justinian I', 'Justinian I.', 482, 83, 0, 'ruler'],
+  ['Мохамед', 'Muhammad', 'Mohammed', 570, 62, 0, 'religion', '', undefined, A],
+  ['Хан Аспарух', 'Khan Asparuh', 'Khan Asparuch', 640, 60, 0, 'ruler', 'bg', undefined, A],
+  ['Карл Велики', 'Charlemagne', 'Karl der Große', 742, 71, 0, 'ruler', '', undefined, A],
+  ['Хан Крум', 'Khan Krum', 'Khan Krum', 755, 59, 0, 'ruler', 'bg', undefined, A],
+  ['Ал-Хорезми', 'Al-Khwarizmi', 'al-Chwarizmi', 780, 70, 0, 'mathematician', '', undefined, A],
+  ['Свети Методий', 'Saint Methodius', 'Method von Saloniki', 815, 70, 0, 'saint', 'bg'],
+  ['Свети Кирил', 'Saint Cyril', 'Kyrill von Saloniki', 827, 42, 0, 'saint', 'bg'],
+  ['Цар Борис I', 'Tsar Boris I', 'Zar Boris I.', 835, 72, 0, 'ruler', 'bg', undefined, A],
+  ['Алфред Велики', 'Alfred the Great', 'Alfred der Große', 849, 50, 0, 'ruler', 'en'],
+  ['Цар Симеон Велики', 'Tsar Simeon the Great', 'Zar Simeon der Große', 864, 63, 0, 'ruler', 'bg'],
+  ['Свети Иван Рилски', 'Saint John of Rila', 'Johannes von Rila', 876, 70, 0, 'saint', 'bg', undefined, A],
+  ['Авицена', 'Avicenna', 'Avicenna', 980, 57, 0, 'physician'],
+  ['Омар Хайям', 'Omar Khayyam', 'Omar Chayyam', 1048, 83, 0, 'poet'],
+  ['Хилдегард фон Бинген', 'Hildegard of Bingen', 'Hildegard von Bingen', 1098, 81, 1, 'saint', 'de'],
+  ['Саладин', 'Saladin', 'Saladin', 1137, 55, 0, 'ruler', '', undefined, A],
+  ['Ричард Лъвското сърце', 'Richard the Lionheart', 'Richard Löwenherz', 1157, 41, 0, 'ruler', 'en'],
+  ['Чингис хан', 'Genghis Khan', 'Dschingis Khan', 1162, 65, 0, 'ruler', '', undefined, A],
+  ['Франциск от Асизи', 'Francis of Assisi', 'Franz von Assisi', 1181, 44, 0, 'saint'],
+  ['Руми', 'Rumi', 'Rumi', 1207, 66, 0, 'poet'],
+  ['Тома Аквински', 'Thomas Aquinas', 'Thomas von Aquin', 1225, 49, 0, 'philosopher'],
+  ['Марко Поло', 'Marco Polo', 'Marco Polo', 1254, 69, 0, 'explorer'],
+  ['Данте Алигиери', 'Dante Alighieri', 'Dante Alighieri', 1265, 56, 0, 'poet'],
+  ['Йоханес Гутенберг', 'Johannes Gutenberg', 'Johannes Gutenberg', 1400, 68, 0, 'inventor', '', 'printing', A],
+  ['Жана д’Арк', 'Joan of Arc', 'Jeanne d’Arc', 1412, 19, 1, 'saint'],
+  ['Христофор Колумб', 'Christopher Columbus', 'Christoph Kolumbus', 1451, 54, 0, 'explorer', '', 'caravel'],
+  ['Леонардо да Винчи', 'Leonardo da Vinci', 'Leonardo da Vinci', 1452, 67, 0, 'painter'],
+  ['Албрехт Дюрер', 'Albrecht Dürer', 'Albrecht Dürer', 1471, 56, 0, 'painter', 'de'],
+  ['Николай Коперник', 'Nicolaus Copernicus', 'Nikolaus Kopernikus', 1473, 70, 0, 'scientist'],
+  ['Микеланджело', 'Michelangelo', 'Michelangelo', 1475, 88, 0, 'painter'],
+  ['Мартин Лутер', 'Martin Luther', 'Martin Luther', 1483, 62, 0, 'religion', 'de'],
+  ['Рафаел', 'Raphael', 'Raffael', 1483, 37, 0, 'painter'],
+  ['Хенри VIII', 'Henry VIII', 'Heinrich VIII.', 1491, 55, 0, 'ruler', 'en'],
+  ['Сюлейман Великолепни', 'Suleiman the Magnificent', 'Süleyman der Prächtige', 1494, 71, 0, 'ruler'],
+  ['Елизабет I', 'Elizabeth I', 'Elisabeth I.', 1533, 69, 1, 'ruler', 'en'],
+  ['Мигел де Сервантес', 'Miguel de Cervantes', 'Miguel de Cervantes', 1547, 68, 0, 'writer'],
+  ['Уилям Шекспир', 'William Shakespeare', 'William Shakespeare', 1564, 52, 0, 'playwright'],
+  ['Галилео Галилей', 'Galileo Galilei', 'Galileo Galilei', 1564, 77, 0, 'scientist', '', 'telescope'],
+  ['Йоханес Кеплер', 'Johannes Kepler', 'Johannes Kepler', 1571, 58, 0, 'scientist'],
+  ['Рене Декарт', 'René Descartes', 'René Descartes', 1596, 53, 0, 'philosopher'],
+  ['Рембранд', 'Rembrandt', 'Rembrandt', 1606, 63, 0, 'painter'],
+  ['Блез Паскал', 'Blaise Pascal', 'Blaise Pascal', 1623, 39, 0, 'mathematician'],
+  ['Антони ван Левенхук', 'Antonie van Leeuwenhoek', 'Antoni van Leeuwenhoek', 1632, 90, 0, 'scientist', '', 'microscope'],
+  ['Луи XIV', 'Louis XIV', 'Ludwig XIV.', 1638, 76, 0, 'ruler'],
+  ['Исак Нютон', 'Isaac Newton', 'Isaac Newton', 1643, 84, 0, 'scientist'],
+  ['Петър Велики', 'Peter the Great', 'Peter der Große', 1672, 52, 0, 'ruler'],
+  ['Антонио Вивалди', 'Antonio Vivaldi', 'Antonio Vivaldi', 1678, 63, 0, 'composer'],
+  ['Йохан Себастиан Бах', 'Johann Sebastian Bach', 'Johann Sebastian Bach', 1685, 65, 0, 'composer'],
+  ['Георг Фридрих Хендел', 'George Frideric Handel', 'Georg Friedrich Händel', 1685, 74, 0, 'composer'],
+  ['Волтер', 'Voltaire', 'Voltaire', 1694, 83, 0, 'philosopher'],
+  ['Бенджамин Франклин', 'Benjamin Franklin', 'Benjamin Franklin', 1706, 84, 0, 'statesman', 'en'],
+  ['Карл Линей', 'Carl Linnaeus', 'Carl von Linné', 1707, 70, 0, 'scientist'],
+  ['Фридрих Велики', 'Frederick the Great', 'Friedrich der Große', 1712, 74, 0, 'ruler', 'de'],
+  ['Мария Терезия', 'Maria Theresa', 'Maria Theresia', 1717, 63, 1, 'ruler', 'de'],
+  ['Паисий Хилендарски', 'Paisius of Hilendar', 'Paisij von Hilandar', 1722, 51, 0, 'historian', 'bg'],
+  ['Имануел Кант', 'Immanuel Kant', 'Immanuel Kant', 1724, 79, 0, 'philosopher'],
+  ['Екатерина Велика', 'Catherine the Great', 'Katharina die Große', 1729, 67, 1, 'ruler'],
+  ['Джордж Вашингтон', 'George Washington', 'George Washington', 1732, 67, 0, 'statesman', 'en'],
+  ['Джеймс Уат', 'James Watt', 'James Watt', 1736, 83, 0, 'inventor', '', 'steam_engine'],
+  ['Жозеф-Мишел Монголфие', 'Joseph-Michel Montgolfier', 'Joseph-Michel Montgolfier', 1740, 69, 0, 'inventor', '', 'balloon'],
+  ['Едуард Дженър', 'Edward Jenner', 'Edward Jenner', 1749, 73, 0, 'physician', '', 'vaccine'],
+  ['Йохан Волфганг фон Гьоте', 'Johann Wolfgang von Goethe', 'Johann Wolfgang von Goethe', 1749, 82, 0, 'poet'],
+  ['Волфганг Амадеус Моцарт', 'Wolfgang Amadeus Mozart', 'Wolfgang Amadeus Mozart', 1756, 35, 0, 'composer'],
+  ['Фридрих Шилер', 'Friedrich Schiller', 'Friedrich Schiller', 1759, 45, 0, 'poet', 'de'],
+  ['Робърт Фултън', 'Robert Fulton', 'Robert Fulton', 1765, 49, 0, 'inventor', '', 'steamship'],
+  ['Наполеон Бонапарт', 'Napoleon Bonaparte', 'Napoleon Bonaparte', 1769, 51, 0, 'ruler'],
+  ['Александър фон Хумболт', 'Alexander von Humboldt', 'Alexander von Humboldt', 1769, 89, 0, 'explorer', 'de'],
+  ['Лудвиг ван Бетовен', 'Ludwig van Beethoven', 'Ludwig van Beethoven', 1770, 56, 0, 'composer'],
+  ['Джейн Остин', 'Jane Austen', 'Jane Austen', 1775, 41, 1, 'writer', 'en'],
+  ['Карл Фридрих Гаус', 'Carl Friedrich Gauss', 'Carl Friedrich Gauß', 1777, 77, 0, 'mathematician'],
+  ['Джордж Стивънсън', 'George Stephenson', 'George Stephenson', 1781, 67, 0, 'inventor', 'en', 'railway'],
+  ['Якоб Грим', 'Jacob Grimm', 'Jacob Grimm', 1785, 78, 0, 'writer', 'de'],
+  ['Луи Дагер', 'Louis Daguerre', 'Louis Daguerre', 1787, 63, 0, 'inventor', '', 'photography'],
+  ['Лорд Байрон', 'Lord Byron', 'Lord Byron', 1788, 36, 0, 'poet', 'en'],
+  ['Самюъл Морз', 'Samuel Morse', 'Samuel Morse', 1791, 80, 0, 'inventor', '', 'telegraph'],
+  ['Майкъл Фарадей', 'Michael Faraday', 'Michael Faraday', 1791, 75, 0, 'scientist'],
+  ['Франц Шуберт', 'Franz Schubert', 'Franz Schubert', 1797, 31, 0, 'composer'],
+  ['Александър Пушкин', 'Alexander Pushkin', 'Alexander Puschkin', 1799, 37, 0, 'poet'],
+  ['Виктор Юго', 'Victor Hugo', 'Victor Hugo', 1802, 83, 0, 'writer'],
+  ['Юстус фон Либих', 'Justus von Liebig', 'Justus von Liebig', 1803, 69, 0, 'scientist', 'de', 'fertilizer'],
+  ['Чарлз Дарвин', 'Charles Darwin', 'Charles Darwin', 1809, 73, 0, 'scientist'],
+  ['Ейбрахам Линкълн', 'Abraham Lincoln', 'Abraham Lincoln', 1809, 56, 0, 'statesman', 'en'],
+  ['Фредерик Шопен', 'Frédéric Chopin', 'Frédéric Chopin', 1810, 39, 0, 'composer'],
+  ['Чарлз Дикенс', 'Charles Dickens', 'Charles Dickens', 1812, 58, 0, 'writer', 'en'],
+  ['Рихард Вагнер', 'Richard Wagner', 'Richard Wagner', 1813, 69, 0, 'composer'],
+  ['Ада Лъвлейс', 'Ada Lovelace', 'Ada Lovelace', 1815, 36, 1, 'mathematician', 'en'],
+  ['Ото фон Бисмарк', 'Otto von Bismarck', 'Otto von Bismarck', 1815, 83, 0, 'statesman', 'de'],
+  ['Карл Маркс', 'Karl Marx', 'Karl Marx', 1818, 64, 0, 'philosopher'],
+  ['Кралица Виктория', 'Queen Victoria', 'Königin Victoria', 1819, 81, 1, 'ruler', 'en'],
+  ['Джоузеф Базалгет', 'Joseph Bazalgette', 'Joseph Bazalgette', 1819, 71, 0, 'engineer', '', 'sewer'],
+  ['Флорънс Найтингейл', 'Florence Nightingale', 'Florence Nightingale', 1820, 90, 1, 'nurse', 'en'],
+  ['Георги Раковски', 'Georgi Rakovski', 'Georgi Rakowski', 1821, 46, 0, 'revolutionary', 'bg'],
+  ['Фьодор Достоевски', 'Fyodor Dostoevsky', 'Fjodor Dostojewski', 1821, 59, 0, 'writer'],
+  ['Луи Пастьор', 'Louis Pasteur', 'Louis Pasteur', 1822, 72, 0, 'scientist'],
+  ['Грегор Мендел', 'Gregor Mendel', 'Gregor Mendel', 1822, 61, 0, 'scientist'],
+  ['Лев Толстой', 'Leo Tolstoy', 'Leo Tolstoi', 1828, 82, 0, 'writer'],
+  ['Дмитрий Менделеев', 'Dmitri Mendeleev', 'Dmitri Mendelejew', 1834, 72, 0, 'scientist'],
+  ['Марк Твен', 'Mark Twain', 'Mark Twain', 1835, 74, 0, 'writer', 'en'],
+  ['Васил Левски', 'Vasil Levski', 'Wassil Lewski', 1837, 35, 0, 'revolutionary', 'bg'],
+  ['Пьотр Чайковски', 'Pyotr Tchaikovsky', 'Pjotr Tschaikowski', 1840, 53, 0, 'composer'],
+  ['Клод Моне', 'Claude Monet', 'Claude Monet', 1840, 86, 0, 'painter'],
+  ['Робърт Кох', 'Robert Koch', 'Robert Koch', 1843, 66, 0, 'physician', 'de'],
+  ['Карл Бенц', 'Karl Benz', 'Carl Benz', 1844, 84, 0, 'inventor', 'de', 'automobile'],
+  ['Фридрих Ницше', 'Friedrich Nietzsche', 'Friedrich Nietzsche', 1844, 55, 0, 'philosopher'],
+  ['Вилхелм Рьонтген', 'Wilhelm Röntgen', 'Wilhelm Conrad Röntgen', 1845, 77, 0, 'scientist'],
+  ['Томас Едисон', 'Thomas Edison', 'Thomas Edison', 1847, 84, 0, 'inventor', '', 'electricity'],
+  ['Христо Ботев', 'Hristo Botev', 'Christo Botew', 1848, 28, 0, 'poet', 'bg'],
+  ['Берта Бенц', 'Bertha Benz', 'Bertha Benz', 1849, 95, 1, 'inventor', 'de'],
+  ['Иван Вазов', 'Ivan Vazov', 'Iwan Wasow', 1850, 71, 0, 'writer', 'bg'],
+  ['Винсент ван Гог', 'Vincent van Gogh', 'Vincent van Gogh', 1853, 37, 0, 'painter'],
+  ['Никола Тесла', 'Nikola Tesla', 'Nikola Tesla', 1856, 86, 0, 'inventor', '', 'electricity'],
+  ['Зигмунд Фройд', 'Sigmund Freud', 'Sigmund Freud', 1856, 83, 0, 'physician'],
+  ['Макс Планк', 'Max Planck', 'Max Planck', 1858, 89, 0, 'scientist'],
+  ['Алеко Константинов', 'Aleko Konstantinov', 'Aleko Konstantinow', 1863, 34, 0, 'writer', 'bg'],
+  ['Мария Кюри', 'Marie Curie', 'Marie Curie', 1867, 66, 1, 'scientist'],
+  ['Махатма Ганди', 'Mahatma Gandhi', 'Mahatma Gandhi', 1869, 78, 0, 'activist'],
+  ['Орвил Райт', 'Orville Wright', 'Orville Wright', 1871, 76, 0, 'inventor', '', 'aviation'],
+  ['Гулиелмо Маркони', 'Guglielmo Marconi', 'Guglielmo Marconi', 1874, 63, 0, 'inventor', '', 'radio'],
+  ['Уинстън Чърчил', 'Winston Churchill', 'Winston Churchill', 1874, 90, 0, 'statesman', 'en'],
+  ['Томас Ман', 'Thomas Mann', 'Thomas Mann', 1875, 80, 0, 'writer', 'de'],
+  ['Елин Пелин', 'Elin Pelin', 'Elin Pelin', 1877, 72, 0, 'writer', 'bg'],
+  ['Пейо Яворов', 'Peyo Yavorov', 'Pejo Jaworow', 1878, 36, 0, 'poet', 'bg'],
+  ['Алберт Айнщайн', 'Albert Einstein', 'Albert Einstein', 1879, 76, 0, 'scientist'],
+  ['Александър Флеминг', 'Alexander Fleming', 'Alexander Fleming', 1881, 73, 0, 'scientist', '', 'antibiotics'],
+  ['Пабло Пикасо', 'Pablo Picasso', 'Pablo Picasso', 1881, 91, 0, 'painter'],
+  ['Франц Кафка', 'Franz Kafka', 'Franz Kafka', 1883, 40, 0, 'writer'],
+  ['Чарли Чаплин', 'Charlie Chaplin', 'Charlie Chaplin', 1889, 88, 0, 'actor'],
+  ['Агата Кристи', 'Agatha Christie', 'Agatha Christie', 1890, 85, 1, 'writer'],
+  ['Дж. Р. Р. Толкин', 'J. R. R. Tolkien', 'J. R. R. Tolkien', 1892, 81, 0, 'writer'],
+  ['Елисавета Багряна', 'Elisaveta Bagryana', 'Elisaweta Bagrjana', 1893, 97, 1, 'poet', 'bg'],
+  ['Марлене Дитрих', 'Marlene Dietrich', 'Marlene Dietrich', 1901, 90, 1, 'actor'],
+  ['Уолт Дисни', 'Walt Disney', 'Walt Disney', 1901, 65, 0, 'animator'],
+  ['Джордж Оруел', 'George Orwell', 'George Orwell', 1903, 46, 0, 'writer'],
+  ['Сергей Корольов', 'Sergei Korolev', 'Sergei Koroljow', 1907, 59, 0, 'engineer', '', 'rocket'],
+  ['Фрида Кало', 'Frida Kahlo', 'Frida Kahlo', 1907, 47, 1, 'painter'],
+  ['Никола Вапцаров', 'Nikola Vaptsarov', 'Nikola Wapzarow', 1909, 32, 0, 'poet', 'bg'],
+  ['Конрад Цузе', 'Konrad Zuse', 'Konrad Zuse', 1910, 85, 0, 'inventor', 'de', 'computer'],
+  ['Майка Тереза', 'Mother Teresa', 'Mutter Teresa', 1910, 87, 1, 'saint'],
+  ['Ванга', 'Baba Vanga', 'Baba Wanga', 1911, 85, 1, 'seer', 'bg'],
+  ['Алън Тюринг', 'Alan Turing', 'Alan Turing', 1912, 41, 0, 'mathematician'],
+  ['Вернер фон Браун', 'Wernher von Braun', 'Wernher von Braun', 1912, 65, 0, 'engineer'],
+  ['Роза Паркс', 'Rosa Parks', 'Rosa Parks', 1913, 92, 1, 'activist'],
+  ['Норман Борлоуг', 'Norman Borlaug', 'Norman Borlaug', 1914, 95, 0, 'scientist', '', 'green_revolution'],
+  ['Нелсън Мандела', 'Nelson Mandela', 'Nelson Mandela', 1918, 95, 0, 'statesman'],
+  ['Йоан Павел II', 'Pope John Paul II', 'Papst Johannes Paul II.', 1920, 84, 0, 'saint'],
+  ['Софи Шол', 'Sophie Scholl', 'Sophie Scholl', 1921, 21, 1, 'activist', 'de'],
+  ['Мартин Лутър Кинг', 'Martin Luther King Jr.', 'Martin Luther King', 1929, 39, 0, 'activist'],
+  ['Ане Франк', 'Anne Frank', 'Anne Frank', 1929, 15, 1, 'writer'],
+  ['Нийл Армстронг', 'Neil Armstrong', 'Neil Armstrong', 1930, 82, 0, 'astronaut', '', 'moon_landing'],
+  ['Юрий Гагарин', 'Yuri Gagarin', 'Juri Gagarin', 1934, 34, 0, 'astronaut'],
+  ['Елвис Пресли', 'Elvis Presley', 'Elvis Presley', 1935, 42, 0, 'singer'],
+  ['Джон Ленън', 'John Lennon', 'John Lennon', 1940, 40, 0, 'singer'],
+  ['Стивън Хокинг', 'Stephen Hawking', 'Stephen Hawking', 1942, 76, 0, 'scientist'],
+  ['Мохамед Али', 'Muhammad Ali', 'Muhammad Ali', 1942, 74, 0, 'athlete'],
+  ['Фреди Меркюри', 'Freddie Mercury', 'Freddie Mercury', 1946, 45, 0, 'singer'],
+  ['Стив Джобс', 'Steve Jobs', 'Steve Jobs', 1955, 56, 0, 'entrepreneur', '', 'smartphone'],
+];
+
+// these died before their birthday in the year of their death
+const DIES_YEAR_AFTER = new Set(['Александър Македонски', 'Октавиан Август', 'Юлий Цезар', 'Вергилий', 'Нерон', 'Марк Аврелий', 'Свети Августин', 'Карл Велики', 'Саладин', 'Ричард Лъвското сърце', 'Франциск от Асизи', 'Марко Поло', 'Христофор Колумб', 'Албрехт Дюрер', 'Микеланджело', 'Мартин Лутер', 'Хенри VIII', 'Сюлейман Великолепни', 'Елизабет I', 'Мигел де Сервантес', 'Галилео Галилей', 'Йоханес Кеплер', 'Рене Декарт', 'Антони ван Левенхук', 'Луи XIV', 'Петър Велики', 'Волтер', 'Карл Линей', 'Имануел Кант', 'Едуард Дженър', 'Йохан Волфганг фон Гьоте', 'Фридрих Шилер', 'Робърт Фултън', 'Наполеон Бонапарт', 'Александър фон Хумболт', 'Лудвиг ван Бетовен', 'Джейн Остин', 'Карл Фридрих Гаус', 'Луи Дагер', 'Самюъл Морз', 'Майкъл Фарадей', 'Александър Пушкин', 'Юстус фон Либих', 'Рихард Вагнер', 'Ада Лъвлейс', 'Карл Маркс', 'Кралица Виктория', 'Джоузеф Базалгет', 'Фьодор Достоевски', 'Луи Пастьор', 'Грегор Мендел', 'Дмитрий Менделеев', 'Марк Твен', 'Васил Левски', 'Робърт Кох', 'Карл Бенц', 'Вилхелм Рьонтген', 'Махатма Ганди', 'Орвил Райт', 'Уинстън Чърчил', 'Александър Флеминг', 'Пабло Пикасо', 'Агата Кристи', 'Елисавета Багряна', 'Марлене Дитрих', 'Джордж Оруел', 'Никола Вапцаров', 'Алън Тюринг', 'Йоан Павел II', 'Софи Шол', 'Ане Франк']);
+
+export const FAMOUS: Famous[] = ROWS.map(([bg, en, de, born, age, sex, role, loc, tech, approx]) => ({
+  bg, en, de, born, age, sex, role,
+  // no year 0: from 1 BC the next year is AD 1
+  died: born + age + (DIES_YEAR_AFTER.has(bg) ? 1 : 0) + (born < 0 && born + age >= 0 ? 1 : 0),
+  ...(loc ? { loc } : {}), ...(tech ? { tech } : {}), ...(approx ? { approx } : {}),
+}));
+
+const BY_BG = new Map(FAMOUS.map((f) => [f.bg, f]));
+
+/** the famous person with this Bulgarian name, if any */
+export function famousByName(bg: string): Famous | undefined {
+  return BY_BG.get(bg);
+}
+
+/** what the person is remembered as, in a language */
+export function fameRole(f: Famous, lang: 'bg' | 'en' | 'de'): string {
+  const r = FAME_ROLE[f.role];
+  return lang === 'bg' ? r[f.sex] : lang === 'en' ? r[2] : r[3 + f.sex];
+}

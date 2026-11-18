@@ -202,6 +202,7 @@ const server = http.createServer((req, res) => {
       return json(res, { ...store.countSince(world, after), events: store.chronicle(world, { after, min: 2, limit: 200 }) });
     }
     if (p === '/api/heroes') return json(res, sim.heroes());
+    if (p === '/api/famous') return json(res, sim.famousList());
     if (p === '/api/stats') return json(res, store.stats(world));
     if (p === '/api/worlds') return json(res, store.worlds());
     if (p === '/api/secrets') return json(res, { found: sim.secretFinds() });

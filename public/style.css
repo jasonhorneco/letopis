@@ -42,6 +42,8 @@ body.kids { --fs: 18px; --side-w: 420px; }
 .time { min-width: 210px; }
 .year { font-family: var(--serif); font-size: 1.6em; line-height: 1.1; }
 .sub { color: var(--muted); }
+.sub.next { font-size: 11px; opacity: .75; }
+.sub.next:empty { display: none; }
 .tick { height: 3px; background: var(--line); border-radius: 2px; margin-top: 6px; overflow: hidden; }
 .tick i { display: block; height: 100%; background: var(--accent); width: 0; }
 .stats { display: flex; gap: 18px; align-items: center; }
@@ -200,3 +202,9 @@ a.ref:hover { border-bottom-style: solid; }
 .kingdoms li > div > div { margin-top: 2px; }
 .kingdoms a { color: var(--accent-2); text-decoration: none; }
 .kingdoms a:hover { text-decoration: underline; }
+
+/* famous people of the real world */
+.fame-star { color: #ff3030; text-shadow: 0 0 4px rgba(255, 48, 48, 0.45); }
+.famous li.found { cursor: pointer; margin-bottom: 4px; line-height: 1.35; }
+.famous li.found .muted { font-size: 12px; }
+.famous .alive { font-size: 11px; color: #7fd18b; margin-left: 4px; }

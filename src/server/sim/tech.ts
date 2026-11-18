@@ -1,3 +1,4 @@
+import { ERA_GATE } from '../../shared/i18n';
 // Discoveries. Each one is found by a real person in a real band, and can spread or be forgotten.
 
 export type Need = 'flint' | 'clay' | 'grain' | 'wildHerd' | 'fish' | 'forest' | 'ore' | null;
@@ -65,16 +66,16 @@ export const TECHS: Tech[] = [
     text: 'Вълчи кутрета останаха при огъня на {band}. {name} ги храни и те станаха първите кучета.',
     kids: '{name} си намери приятел: малко вълче, което стана първото куче!' },
   // gateway to the New Stone Age
-  { id: 'grinding', name: 'Мелене на зърно', era: 1, target: -8800, prereq: ['stone_tools'], need: 'grain', base: 0.0025, gene: 'int',
+  { id: 'grinding', name: 'Мелене на зърно', era: 0, target: -8800, prereq: ['stone_tools'], need: 'grain', base: 0.0025, gene: 'int',
     text: '{name} от {band} смля диви зърна между два камъка. От брашното става храна за зимата.',
     kids: '{name} смачка зрънца между два камъка и направи брашно.' },
   { id: 'agriculture', name: 'Земеделие', era: 1, target: -7100, prereq: ['grinding', 'pottery'], need: 'grain', base: 0.0008, gene: 'int',
     text: '{name} от {band} забеляза, че от падналите зърна растат нови. Родът засява първата нива и спира да скита.',
     kids: '{name} посади семена и от тях израснаха нови растения! Хората вече могат да остават на едно място.' },
-  { id: 'pottery', name: 'Керамика', era: 1, target: -8300, prereq: ['fire'], need: 'clay', base: 0.002, gene: 'cur',
+  { id: 'pottery', name: 'Керамика', era: 0, target: -8300, prereq: ['fire'], need: 'clay', base: 0.002, gene: 'cur',
     text: '{name} от {band} изпече глина в огъня. Гърнетата пазят храната от мишки и влага.',
     kids: '{name} изпече глинено гърне. Сега храната може да се пази дълго!' },
-  { id: 'herding', name: 'Скотовъдство', era: 1, target: -7900, prereq: ['dog'], need: 'wildHerd', base: 0.0015, gene: 'soc',
+  { id: 'herding', name: 'Скотовъдство', era: 1, target: -6900, prereq: ['dog'], need: 'wildHerd', base: 0.0015, gene: 'soc',
     text: '{name} от {band} затвори диви кози в кошара. Месо и мляко без лов.',
     kids: '{name} опитоми кози. Вече има мляко всеки ден!' },
   { id: 'weaving', name: 'Тъкане', era: 1, target: -6600, prereq: ['agriculture'], need: null, base: 0.0025, gene: 'int',
@@ -83,7 +84,7 @@ export const TECHS: Tech[] = [
   { id: 'mudbrick', name: 'Глинени къщи', era: 1, target: -6300, prereq: ['agriculture', 'pottery'], need: null, base: 0.003, gene: 'str',
     text: 'В {band} {name} издигна първата къща от плет и глина. Селото започва да прилича на дом.',
     kids: '{name} построи истинска къща от глина!' },
-  { id: 'boats', name: 'Лодка от дънер', era: 1, target: -9400, prereq: ['stone_tools', 'fishing'], need: 'fish', base: 0.0015, gene: 'cur',
+  { id: 'boats', name: 'Лодка от дънер', era: 0, target: -9400, prereq: ['stone_tools', 'fishing'], need: 'fish', base: 0.0015, gene: 'cur',
     text: '{name} от {band} издълба лодка от дънер. Реките вече не са граница.',
     kids: '{name} направи лодка и тръгна по реката!' },
   // copper age: the last steps of the farmers before bronze
@@ -379,15 +380,13 @@ export const TECH_BY_ID = new Map(TECHS.map((t) => [t.id, t]));
 
 /** Era of a set of known techs: the highest era with a defining tech known. */
 export function eraOf(techs: Set<string>): number {
-  if (techs.has('moon_base')) return 8;
-  if (techs.has('computer')) return 7;
-  if (techs.has('steam_engine')) return 6;
-  if (techs.has('caravel')) return 5;
-  if (techs.has('heavy_plough')) return 4;
-  if (techs.has('iron')) return 3;
-  if (techs.has('bronze')) return 2;
-  if (techs.has('agriculture')) return 1;
+  for (let e = ERA_GATE.length - 1; e >= 1; e--) if (techs.has(ERA_GATE[e])) return e;
   return 0;
+}
+
+/** discoveries belong to the age the world is in: only the gateway to the next age may come early */
+export function techOpen(tech: Tech, worldEra: number): boolean {
+  return tech.era <= worldEra || tech.id === ERA_GATE[worldEra + 1];
 }
 
 export function techCountForEra(era: number): number {
