@@ -427,6 +427,25 @@ group('dronekid', cells('CQ', (3,)), 'pose', PEOPLE_WPP, 0)
 group('eldercouple', cells('CQ', (4,)), 'pose', PEOPLE_WPP, 0)
 group('rgwalk', cells('CR', (1, 2)), 'person', 13.6, 64)
 group('rgidle', cells('CR', (3, 4)), 'person', 13.6, 64)
+# canoes and fishing (CS: canoe paddling towards us / away, net cast from the canoe, rod on the bank; CT: carrying fish home, woman with rod, net pulled in the shallows)
+group('canoese', cells('CS', (1,)), 'pose', PEOPLE_WPP, 0)
+group('canoene', cells('CS', (2,)), 'pose', PEOPLE_WPP, 0)
+group('canoenet', cells('CS', (3,)), 'pose', PEOPLE_WPP, 0)
+group('rodfish', cells('CS', (4,)), 'pose', PEOPLE_WPP, 0)
+group('fishcarry', cells('CT', (1,)), 'pose', PEOPLE_WPP, 0)
+group('fishbasket', cells('CT', (2,)), 'pose', PEOPLE_WPP, 0)
+group('rodfishf', cells('CT', (3,)), 'pose', PEOPLE_WPP, 0)
+group('netpull', cells('CT', (4,)), 'pose', PEOPLE_WPP, 0)
+# fishing in the later ages (CU antiquity + middle ages, CV 1600s + 1800s, CW today + future): man with a rod, woman with the catch
+for cid, rows in (('CU', ('e2', 'e4')), ('CV', ('e5', 'e6')), ('CW', ('e7', 'e8'))):
+    for k, era in enumerate(rows):
+        group(f'{era}rodfish', cells(cid, (2 * k + 1,)), 'pose', PEOPLE_WPP, 0)
+        group(f'{era}fishbasket', cells(cid, (2 * k + 2,)), 'pose', PEOPLE_WPP, 0)
+# boats after the dugout (CX): wooden rowing boat and motorboat, towards us / away
+group('skiffse', cells('CX', (1,)), 'pose', PEOPLE_WPP, 0)
+group('skiffne', cells('CX', (2,)), 'pose', PEOPLE_WPP, 0)
+group('motorse', cells('CX', (3,)), 'pose', PEOPLE_WPP, 0)
+group('motorne', cells('CX', (4,)), 'pose', PEOPLE_WPP, 0)
 # everyday clothes of each age (sheets BS-CD, two per age: adults, then children and more poses); prefix e<era>
 for pre, a, b in (('e2', 'BS', 'BT'), ('e4', 'BU', 'BV'), ('e5', 'BW', 'BX'), ('e6', 'BY', 'BZ'), ('e7', 'CA', 'CB'), ('e8', 'CC', 'CD')):
     group(pre + 'walk', cells(a, (1,)), 'person', 11, 64)
@@ -509,6 +528,16 @@ def split_cloth(img: Image.Image, head: float, bright: float = 0.45, satmax: flo
     c[..., 0] = c[..., 1] = c[..., 2] = g
     c[..., 3] = np.where(cloth, a[..., 3], 0)
     return Image.fromarray(base.astype(np.uint8)), Image.fromarray(c.astype(np.uint8))
+
+
+def keep_fish(img: Image.Image, base: Image.Image, cloth: Image.Image) -> tuple[Image.Image, Image.Image]:
+    """Silver fish and water foam are as pale as the clothes, but bluish: they go back to the base layer."""
+    o = np.array(img).astype(np.int16)
+    b, c = np.array(base), np.array(cloth)
+    blue = (o[..., 2] > o[..., 0] + 8) & (c[..., 3] > 0)
+    b[blue] = o[blue].astype(np.uint8)
+    c[blue, 3] = 0
+    return Image.fromarray(b), Image.fromarray(c)
 
 
 def split_fur(img: Image.Image, head: float) -> tuple[Image.Image, Image.Image]:
@@ -652,7 +681,20 @@ def main() -> int:
                 items.append((name, base, 0.5, ay, s))
                 items.append((name + '_c', cloth, 0.5, ay, s))
                 continue
-            if kind == 'pose' and cid[:2] in ('AB', 'AC', 'AD', 'AE'):
+            if kind == 'pose' and cid[:2] in ('CU', 'CV', 'CW', 'CX'):
+                # later fishing and boats: CU/CV keep their own shaded colours (a tint only came out in patches);
+                # CW tints only the collar, like the other sheets of today; the rowing boat the shirt; the motorboat stays white
+                if cid[:3] in ('CX3', 'CX4') or cid[:2] in ('CU', 'CV'):
+                    items.append((name, img, 0.5, ay, s))
+                    continue
+                base, cloth = (split_cloth(img, 0.25, upto=0.36) if cid[:2] == 'CW'
+                               else split_cloth(img, 0.15, 0.6, upto=0.6) if cid[:2] == 'CX'
+                               else split_cloth(img, 0.28, 0.66, upto=0.78))
+                base, cloth = keep_fish(img, base, cloth)
+                items.append((name, base, 0.5, ay, s))
+                items.append((name + '_c', cloth, 0.5, ay, s))
+                continue
+            if kind == 'pose' and cid[:2] in ('AB', 'AC', 'AD', 'AE', 'CS', 'CT'):
                 # sleeping people lie down (no head on top); the storyteller's long beard reaches half way down
                 head = 0 if cid[:3] in ('AC1', 'AC2') else 0.55 if cid[:2] == 'AD' else 0.3
                 base, cloth = split_fur(img, head)
