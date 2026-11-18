@@ -1,21 +1,31 @@
 // Sounds of the place under the camera, from real recordings (public/sounds, all CC0, see CREDITS.md):
 // a river or the sea, birds by day and crickets at night, a hammer in the villages and the fire at night,
-// the calls of the animals nearby. Close to the ground they are clear; the higher the camera goes,
+// people talking in the villages, the calls of the animals nearby. Close to the ground they are clear; the higher the camera goes,
 // the more they blur together and fade away.
 
 import type { WorldRenderer } from './render';
 import { TW, TH } from './render';
 import { Biome, isWater, RIVER_WATER } from '../shared/types';
 
-const BEDS = ['river', 'sea', 'birds', 'crickets', 'fire'] as const;
+const BEDS = ['river', 'sea', 'birds', 'crickets', 'fire', 'crowd'] as const;
 type Bed = (typeof BEDS)[number];
 const HAMMERS = ['hammer1', 'hammer2', 'hammer3', 'hammer4'];
 
 /** the animals we have a real recording of; the others stay quiet rather than sound fake */
 const CALLS: Record<string, string> = {
   owl: 'owl', lion: 'growl', bear: 'growl', cavebear: 'growl',
+  cow: 'cow', aurochs: 'cow', bison: 'cow',
+  sheep: 'sheep', goat: 'goat',
+  dog: 'dog', wolf: 'wolf',
+  horse: 'horse', wildhorse: 'horse', donkey: 'donkey',
+  pig: 'pig', boar: 'pig',
+  hen: 'hen', cat: 'cat',
+  crow: 'crow', duck: 'duck',
+  elephant: 'elephant', mammoth: 'elephant',
 };
-const NIGHT_CALLS = new Set(['owl']);
+const NIGHT_CALLS = new Set(['owl', 'wolf']);
+/** how loud each call is next to the others: the dog and the donkey would wake the house */
+const CALL_GAIN: Record<string, number> = { dog: 0.6, donkey: 0.5, elephant: 0.6, wolf: 0.7, hen: 0.8, crow: 0.7 };
 
 export class Soundscape {
   on = false;
@@ -117,6 +127,8 @@ export class Soundscape {
     set('birds', night ? 0 : green * 0.35 * bed);
     set('crickets', night ? green * 0.18 * bed : 0);
     set('fire', night ? m.crowd * 0.35 * clear : 0);
+    // people talking in the village by day, soft and only close down
+    set('crowd', night ? 0 : m.crowd * 0.12 * clear);
     if (clear < 0.05) return;
     // the village by day: a hammer now and then
     if (now > this.next.village && m.crowd > 0.15 && !night) {
@@ -133,7 +145,8 @@ export class Soundscape {
       if (pick) {
         const d = Math.hypot(pick.x - cx, pick.y - cy);
         const sx = ((pick.x - pick.y) * (TW / 2) - camX) * zoom;
-        this.play(CALLS[pick.sp.id], clear * (1 - d / R) * 0.5, sx / halfW);
+        const name = CALLS[pick.sp.id];
+        this.play(name, clear * (1 - d / R) * 0.4 * (CALL_GAIN[name] ?? 1), sx / halfW);
       }
     }
   }
