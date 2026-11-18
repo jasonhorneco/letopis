@@ -28,6 +28,23 @@ Notes:
 | sfc32 random number generator | Own implementation of Chris Doty-Humphrey's public algorithm (PractRand), `src/shared/rng.ts` | the project | own code |
 | Fonts | System fonts of the device, nothing is downloaded | – | – |
 
+## Sounds
+
+All sounds are public domain (CC0 1.0), cut into short loops, loudness-matched and re-encoded as Opus in `public/sounds/`.
+
+| File | Recording | Author | License |
+|---|---|---|---|
+| `river.ogg` | [Relaxing River Sound](https://freesound.org/s/722875/) | IceVFX | CC0 1.0 |
+| `sea.ogg` | [Crashing Waves - Pacific Ocean](https://freesound.org/s/817075/) | SecureSubset | CC0 1.0 |
+| `birds.ogg` | [Forest quiet atmosphere with some birds](https://freesound.org/s/414098/) | felix.blume | CC0 1.0 |
+| `crickets.ogg` | [Crickets (close recording)](https://freesound.org/s/476672/) | felix.blume | CC0 1.0 |
+| `fire.ogg` | [Fireplace sound loop](https://opengameart.org/content/fireplace-sound-loop) | PagDev | CC0 1.0 |
+| `hammer1.ogg` … `hammer4.ogg` | Wood and metal sound effects, rubberduck's CC0 packs on OpenGameArt ([copy in Free-SFX](https://github.com/EternityForest/Free-SFX/tree/main/rubberduck/WoodMetal)) | rubberduck | CC0 1.0 |
+| `owl.ogg` | [Owl hoot](https://freesound.org/s/465697/) | breviceps | CC0 1.0 |
+| `growl.ogg` | [Lion growl](https://freesound.org/s/516829/) | matrixxx | CC0 1.0 |
+
+The loops were found through the CC0 collections [funcoder/omarchy-ambient](https://github.com/funcoder/omarchy-ambient) and [EternityForest/Free-SFX](https://github.com/EternityForest/Free-SFX).
+
 ## Names and translations
 
 Bulgarian personal names, nicknames, settlement roots and clan totems are common words and names, collected by hand in
