@@ -666,6 +666,8 @@ def main() -> int:
             else:
                 # foot of a prop: the middle of its grass patch, about 8% of the width above the bottom
                 ay = max(0.5, 1 - 0.08 * w0 / h0)
+                if cid[:2] == 'CH' and cid[:4] not in ('CH41', 'CH42'):
+                    ay = 0.9  # cars, buses, planes, the helicopter and the truck have no ground patch under them
             if kind == 'symbol':
                 a[..., :3] = 255  # black silhouettes -> white, tinted in game
                 src = Image.fromarray(a)
