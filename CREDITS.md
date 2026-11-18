@@ -42,6 +42,20 @@ All sounds are public domain (CC0 1.0), cut into short loops, loudness-matched a
 | `hammer1.ogg` … `hammer4.ogg` | Wood and metal sound effects, rubberduck's CC0 packs on OpenGameArt ([copy in Free-SFX](https://github.com/EternityForest/Free-SFX/tree/main/rubberduck/WoodMetal)) | rubberduck | CC0 1.0 |
 | `owl.ogg` | [Owl hoot](https://freesound.org/s/465697/) | breviceps | CC0 1.0 |
 | `growl.ogg` | [Lion growl](https://freesound.org/s/516829/) | matrixxx | CC0 1.0 |
+| `cow.ogg` | [Cow moo](https://freesound.org/s/59245/) | Zozzy | CC0 1.0 |
+| `sheep.ogg` | [Sheep](https://freesound.org/s/710300/) | michaelperfect | CC0 1.0 |
+| `goat.ogg` | [Goat](https://freesound.org/s/581240/) | Kinoton | CC0 1.0 |
+| `dog.ogg` | [Dog barking](https://freesound.org/s/386766/) | ken788 | CC0 1.0 |
+| `wolf.ogg` | [Wolf howl](https://freesound.org/s/398430/) | NaturesTemper | CC0 1.0 |
+| `horse.ogg` | [Horse neigh](https://freesound.org/s/521246/) | poodaddy69 | CC0 1.0 |
+| `donkey.ogg` | [Donkey bray](https://freesound.org/s/675411/) | craigsmith | CC0 1.0 |
+| `pig.ogg` | [Pig grunts](https://freesound.org/s/233183/) | JarredGibb | CC0 1.0 |
+| `hen.ogg` | [Hen clucking](https://freesound.org/s/456803/) | Breviceps | CC0 1.0 |
+| `cat.ogg` | [Cat meow](https://freesound.org/s/110011/) | tuberatanka | CC0 1.0 |
+| `crow.ogg` | [Crow caw](https://freesound.org/s/536732/) | egomassive | CC0 1.0 |
+| `duck.ogg` | [Duck quacks](https://freesound.org/s/607226/) | D4XX | CC0 1.0 |
+| `elephant.ogg` | [Elephant trumpet](https://freesound.org/s/527845/) | D.jones | CC0 1.0 |
+| `crowd.ogg` | [CROWD village square](https://freesound.org/s/648483/) | nicoproson | CC0 1.0 |
 
 The loops were found through the CC0 collections [funcoder/omarchy-ambient](https://github.com/funcoder/omarchy-ambient) and [EternityForest/Free-SFX](https://github.com/EternityForest/Free-SFX).
 
