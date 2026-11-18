@@ -49,13 +49,15 @@ export class Atlas {
     const meta = await fetch(`${base}/atlas.json${v}`).then((r) => r.json());
     const files: string[] = meta.pages ? meta.pages.map((p: { file: string }) => p.file) : ['atlas.webp'];
     const sources = await Promise.all(files.map(async (file) => {
-      const blob = await fetch(`${base}/${file}${v}`).then((r) => r.blob());
-      // WebGL ignores its premultiply flag for ImageBitmaps, so premultiply here and tell Pixi it is done;
-      // otherwise half-transparent edges are drawn too bright (light halos around every sprite)
-      const bitmap = await createImageBitmap(blob, { premultiplyAlpha: 'premultiply' });
+      // a plain <img> with premultiply-on-upload: the one path every browser handles fast. Firefox treats
+      // premultiplied ImageBitmap uploads as a deprecated slow path (up to a minute, even a lost WebGL context)
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = `${base}/${file}${v}`;
+      await img.decode();
       return new ImageSource({
-        resource: bitmap,
-        alphaMode: 'premultiplied-alpha',
+        resource: img,
+        alphaMode: 'premultiply-alpha-on-upload',
         autoGenerateMipmaps: true,
         scaleMode: 'linear',
         mipmapFilter: 'linear',
