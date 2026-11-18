@@ -210,5 +210,5 @@ export function helpWindowHtml(): string {
       <summary>${title(r.v)}</summary>
       <ul>${[...r.items].sort((a, b) => rank(a) - rank(b)).map(itemHtml).join('')}</ul>
     </details>`).join('');
-  return `<h2>${T('Летопис', 'Letopis', 'Letopis')}</h2><div class="releases">${releases}</div>${helpHtml()}`;
+  return `<h2>${T('Летопис', 'Letopis', 'Letopis')}</h2>${helpHtml()}<div class="releases">${releases}</div>`;
 }

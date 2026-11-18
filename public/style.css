@@ -179,7 +179,7 @@ a.ref:hover { border-bottom-style: solid; }
 
 /* the "?" window: one line per version that opens and closes, then the help */
 .card.helpcard { width: min(600px, calc(100vw - 32px)); }
-.releases { margin: 10px 0 4px; }
+.releases { margin: 18px 0 4px; }
 .release { border: 1px solid var(--line); border-radius: 10px; margin: 0 0 8px; background: rgba(255, 255, 255, 0.03); }
 .release summary { cursor: pointer; padding: 9px 12px; color: var(--accent-2); font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
 .release summary::-webkit-details-marker { display: none; }
