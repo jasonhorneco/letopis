@@ -100,7 +100,8 @@ function tick() {
     if (sim.s.tick % 12 === 0) {
       store.addStat(sim.s.worldId, {
         tick: sim.s.tick, year: Math.floor(sim.year), population: sim.s.people.length, bands: sim.s.bands.length,
-        era: sim.s.era, techs: sim.s.discovered.length,
+        era: sim.s.era, techs: sim.s.discovered.length, villages: sim.s.bands.filter((b) => b.settled).length,
+        born: sim.s.totalBorn, died: sim.s.totalDied, kingdoms: sim.s.kingdoms?.length ?? 0, disaster: sim.s.disasterDead ?? 0,
       });
     }
     broadcast();

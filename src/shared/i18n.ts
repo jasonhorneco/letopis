@@ -417,6 +417,8 @@ export const CAUSE_EN: Record<string, string> = {
   'почина от старост': 'died of old age',
   'почина като дете': 'died as a child',
   'почина от болест': 'died of illness',
+  'загина при наводнение': 'drowned in a flood',
+  'почина при епидемията': 'died in the epidemic',
 };
 export const causeEn = (bg: string) => CAUSE_EN[bg] ?? bg;
 

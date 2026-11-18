@@ -131,6 +131,8 @@ export interface SimState {
   discovered: string[]; // techs known by anyone ever (first discovery)
   totalBorn: number;
   totalDied: number;
+  /** everyone a flood, drought or plague has taken */
+  disasterDead?: number;
   era: number;
   startedAt: number;
   milestone: number;
@@ -1079,6 +1081,7 @@ export class Simulation {
     if (this.month === 8) { this.growTowns(); this.gatherVillages(); }
     if (this.s.tick % 6 === 0) this.explore();
     this.randomEvents(members);
+    this.disasters(members);
     this.checkEra();
     this.milestones();
     this.fixStrays();
@@ -1522,7 +1525,7 @@ export class Simulation {
     }
   }
 
-  private die(p: Person, cause: string, bandMembers?: Person[]) {
+  private die(p: Person, cause: string, bandMembers?: Person[], quiet = false) {
     if (!this.byId.has(p.id)) return;
     const b = this.bandById.get(p.bandId);
     this.byId.delete(p.id);
@@ -1547,6 +1550,8 @@ export class Simulation {
     const nE = this.nameEn(p), he = p.sex ? 'she' : 'he', ofB = b ? this.bandEnLabel(b) : 'the clan';
     const nD = this.nameDe(p), er = p.sex ? 'sie' : 'er', ausB = b ? this.bWith('aus', b) : 'aus dem Clan';
     const found = p.deeds.find((d) => d.startsWith('Откри'));
+    // a disaster names its dead all at once, village by village
+    if (quiet && !p.fame) return;
     if (p.fame) {
       const f = FAMOUS[p.fame - 1];
       const rec = this.s.famous?.find((r) => r.id === p.id);
@@ -2049,6 +2054,102 @@ export class Simulation {
         [`Eine Dürre verbrannte das Gras rund um ${this.bDe(b, 'akk')}. In diesem Jahr gibt es wenig Früchte.`]);
     }
     this.seasonEvents();
+  }
+
+  // ---------- disasters: a flood, a drought, a plague, a cattle plague over a whole region ----------
+
+  private disasters(members: Map<number, Person[]>) {
+    if (this.s.bands.length < 4) return;
+    const settled = this.s.bands.filter((b) => b.settled);
+    let kind: 'flood' | 'drought' | 'epidemic' | 'murrain' | null = null;
+    if (this.month === 3 && this.rng.chance(0.04)) kind = 'flood';
+    else if (this.month === 6 && this.rng.chance(0.02)) kind = 'drought';
+    else if (this.month === 4 && this.rng.chance(0.025)) kind = 'murrain';
+    else if (this.s.era >= 1 && settled.length >= 3 && this.rng.chance(0.0025)) kind = 'epidemic';
+    if (!kind) return;
+    const pool = kind === 'flood' ? settled.filter((b) => this.areaHas(b, 3, 'fish'))
+      : kind === 'murrain' ? this.s.bands.filter((b) => this.hasTech(b, 'herding'))
+      : kind === 'epidemic' ? settled.filter((b) => (members.get(b.id)?.length ?? 0) >= 30) : this.s.bands;
+    if (!pool.length) return;
+    const c = this.rng.pick(pool);
+    const R = kind === 'drought' ? 14 : kind === 'flood' ? 8 : 11;
+    const hit = pool.filter((b) => Math.hypot(b.cx - c.cx, b.cy - c.cy) <= R).slice(0, 12);
+    const dead = new Map<Band, number>();
+    for (const b of hit) {
+      const m = members.get(b.id) ?? [];
+      let rate = 0, cause = '';
+      if (kind === 'flood') {
+        b.food *= 0.6;
+        rate = 0.025;
+        cause = 'загина при наводнение';
+      } else if (kind === 'drought') {
+        b.food *= 0.4;
+        const cx = Math.round(b.cx), cy = Math.round(b.cy);
+        for (let y = cy - 6; y <= cy + 6; y++) for (let x = cx - 6; x <= cx + 6; x++) if (inBounds(x, y)) this.t.plants[idx(x, y)] *= 0.5;
+        // an aqueduct carries a village through a dry year
+        rate = this.hasTech(b, 'aqueduct') ? 0.004 : b.settled ? 0.012 : 0.02;
+        cause = 'почина в гладна година';
+      } else if (kind === 'murrain') {
+        b.food *= 0.7;
+      } else {
+        // crowded towns suffer most; every step of medicine makes it milder
+        rate = 0.06 + Math.min(0.08, m.length / 4000);
+        for (const [t, f] of [['herb_lore', 0.85], ['medicine', 0.6], ['vaccine', 0.45], ['antibiotics', 0.4], ['genome', 0.5]] as const) if (this.hasTech(b, t)) rate *= f;
+        rate *= 0.6 + this.rng.next() * 0.8;
+        cause = 'почина при епидемията';
+      }
+      if (!rate) continue;
+      let n = 0;
+      for (const p of [...m]) {
+        if (p.fame) continue;
+        const a = this.ageOf(p);
+        if (this.rng.chance(rate * (a < 5 || a > 60 ? 2 : 1))) { this.die(p, cause, m, true); n++; }
+      }
+      if (n) dead.set(b, n);
+    }
+    const total = [...dead.values()].reduce((x, y) => x + y, 0);
+    this.s.disasterDead = (this.s.disasterDead ?? 0) + total;
+    const worst = [...dead].sort((a, b) => b[1] - a[1]);
+    const top = worst.slice(0, 5), more = worst.length - top.length;
+    const listBg = top.map(([b, n]) => `${this.bandLabel(b)} (${n})`).join(', ') + (more > 0 ? ` и още ${more} ${more === 1 ? 'място' : 'места'}` : '');
+    const listEn = top.map(([b, n]) => `${this.bandEnLabel(b)} (${n})`).join(', ') + (more > 0 ? ` and ${more} more ${more === 1 ? 'place' : 'places'}` : '');
+    const listDe = top.map(([b, n]) => `${this.bDe(b, 'nom')} (${n})`).join(', ') + (more > 0 ? ` und ${more} weitere ${more === 1 ? 'Ort' : 'Orte'}` : '');
+    const deadBg = total ? ` Загинаха ${total} души: ${listBg}.` : '';
+    const deadEn = total ? ` ${total} ${total === 1 ? 'person' : 'people'} died: ${listEn}.` : '';
+    const deadDe = total ? ` ${total} ${total === 1 ? 'Mensch starb' : 'Menschen starben'}: ${listDe}.` : '';
+    const where = this.bandLabel(c), whereEn = this.bandEnLabel(c), places = hit.length;
+    const refs = hit.flatMap((b) => this.bRefs(b));
+    const imp = total >= 20 ? 3 : 2;
+    if (kind === 'flood') {
+      this.emit('flood', imp, `Голямо наводнение около ${where}: реката излезе от бреговете си и заля ${places === 1 ? 'селото' : `${places} села`}. Водата отнесе къщи, ниви и запаси.${deadBg}`,
+        `Реката преля около ${where}. Хората се качиха на хълма и чакаха водата да се оттегли.`, undefined, c.id, refs,
+        [`A great flood around ${whereEn}: the river broke its banks and covered ${places === 1 ? 'the village' : `${places} villages`}. The water took houses, fields and stores.${deadEn}`,
+          `The river overflowed around ${whereEn}. People climbed the hill and waited for the water to go down.`],
+        [`Ein großes Hochwasser rund um ${this.bDe(c, 'akk')}: Der Fluss trat über die Ufer und überschwemmte ${places === 1 ? 'das Dorf' : `${places} Dörfer`}. Das Wasser riss Häuser, Felder und Vorräte mit.${deadDe}`,
+          `Rund um ${this.bDe(c, 'akk')} ist der Fluss über die Ufer getreten. Die Menschen stiegen auf den Hügel und warteten, bis das Wasser zurückging.`]);
+    } else if (kind === 'drought') {
+      this.emit('drought', imp, `Велика суша около ${where}. Цяло лято не капна дъжд, изворите пресъхнаха, а нивите изгоряха.${deadBg}`,
+        `Цяло лято не валя около ${where}. Всички пестят водата и чакат дъжда.`, undefined, c.id, refs,
+        [`A great drought around ${whereEn}. Not a drop of rain fell all summer, the springs dried up and the fields burned.${deadEn}`,
+          `It did not rain all summer around ${whereEn}. Everyone saves water and waits for the rain.`],
+        [`Eine große Dürre rund um ${this.bDe(c, 'akk')}. Den ganzen Sommer fiel kein Tropfen Regen, die Quellen versiegten und die Felder verbrannten.${deadDe}`,
+          `Rund um ${this.bDe(c, 'akk')} hat es den ganzen Sommer nicht geregnet. Alle sparen Wasser und warten auf Regen.`]);
+    } else if (kind === 'murrain') {
+      this.emit('murrain', 1, `Мор по добитъка около ${where}. В ${places === 1 ? 'селото' : `${places} села`} умряха кози, овце и крави, а млякото и месото не стигат.`,
+        `Животните около ${where} се разболяха. Овчарите ги лекуват с билки.`, undefined, c.id, refs,
+        [`A cattle plague around ${whereEn}. In ${places === 1 ? 'the village' : `${places} villages`} goats, sheep and cows died, and there is not enough milk and meat.`,
+          `The animals around ${whereEn} fell ill. The shepherds treat them with herbs.`],
+        [`Eine Viehseuche rund um ${this.bDe(c, 'akk')}. In ${places === 1 ? 'dem Dorf' : `${places} Dörfern`} starben Ziegen, Schafe und Kühe, und Milch und Fleisch reichen nicht.`,
+          `Rund um ${this.bDe(c, 'akk')} sind die Tiere krank geworden. Die Hirten behandeln sie mit Kräutern.`]);
+    } else {
+      const modern = this.hasTech(c, 'computer');
+      this.emit('epidemic', imp, `${modern ? 'Пандемия' : 'Мор'} плъзна от ${where} към съседните места. Болестта влизаше от къща в къща.${deadBg}`,
+        `Много хора около ${where} се разболяха. Лечителите не спят, а всички стоят по домовете си.`, undefined, c.id, refs,
+        [`${modern ? 'A pandemic' : 'A plague'} spread from ${whereEn} to the places nearby. The sickness went from house to house.${deadEn}`,
+          `Many people around ${whereEn} fell ill. The healers do not sleep, and everyone stays at home.`],
+        [`${modern ? 'Eine Pandemie' : 'Eine Seuche'} breitete sich ${this.bWith('von', c)} in die Orte ringsum aus. Die Krankheit ging von Haus zu Haus.${deadDe}`,
+          `Rund um ${this.bDe(c, 'akk')} sind viele Menschen krank geworden. Die Heiler schlafen nicht, und alle bleiben zu Hause.`]);
+    }
   }
 
   /** the year turning: an early spring, a spring flood, locusts, a rich harvest, a harvest feast */

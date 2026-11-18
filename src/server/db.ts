@@ -26,6 +26,9 @@ export class Store {
     `);
     // v1.11: names in the chronicle link to people and bands
     const cols = this.db.prepare('PRAGMA table_info(chronicle)').all() as { name: string }[];
+    // v1.70: more numbers for the charts
+    const sc = this.db.prepare('PRAGMA table_info(stats)').all() as { name: string }[];
+    for (const c of ['villages', 'born', 'died', 'kingdoms', 'disaster']) if (!sc.some((x) => x.name === c)) this.db.exec(`ALTER TABLE stats ADD COLUMN ${c} INTEGER`);
     if (!cols.some((c) => c.name === 'refs')) this.db.exec('ALTER TABLE chronicle ADD COLUMN refs TEXT');
     // v1.15: every entry is also written in English
     if (!cols.some((c) => c.name === 'en')) this.db.exec('ALTER TABLE chronicle ADD COLUMN en TEXT');
@@ -83,12 +86,13 @@ export class Store {
     return row ? JSON.parse(row.json) : null;
   }
 
-  addStat(world: string, s: { tick: number; year: number; population: number; bands: number; era: number; techs: number }) {
-    this.db.prepare('INSERT OR REPLACE INTO stats VALUES (?,?,?,?,?,?,?)').run(world, s.tick, s.year, s.population, s.bands, s.era, s.techs);
+  addStat(world: string, s: { tick: number; year: number; population: number; bands: number; era: number; techs: number; villages: number; born: number; died: number; kingdoms: number; disaster: number }) {
+    this.db.prepare('INSERT OR REPLACE INTO stats (world, tick, year, population, bands, era, techs, villages, born, died, kingdoms, disaster) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(world, s.tick, s.year, s.population, s.bands, s.era, s.techs, s.villages, s.born, s.died, s.kingdoms, s.disaster);
   }
 
   stats(world: string, max = 400) {
-    const rows = this.db.prepare('SELECT tick, year, population, bands, era, techs FROM stats WHERE world = ? ORDER BY tick').all(world) as Record<string, number>[];
+    const rows = this.db.prepare('SELECT tick, year, population, bands, era, techs, villages, born, died, kingdoms, disaster FROM stats WHERE world = ? ORDER BY tick').all(world) as Record<string, number>[];
     if (rows.length <= max) return rows;
     const step = rows.length / max;
     const out = [];
