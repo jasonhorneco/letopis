@@ -20,6 +20,23 @@ const TAG_ORDER: Tag[] = ['breaking', 'new', 'old'];
 
 /** newest first; a new version gets its own entry here */
 export const CHANGELOG: Release[] = [
+  { v: '1.70', items: [
+    ['Бедствия: наводнения, суши, мор и мор по добитъка засягат цели области, а не само едно село. Летописът казва колко души са загинали и в кои села. Медицината, ваксините и антибиотиците правят мора по-лек, а акведуктът пази от сушата.',
+      'Disasters: floods, droughts, plagues and cattle plagues strike whole regions, not just one village. The chronicle tells how many people died and in which villages. Medicine, vaccines and antibiotics make plagues milder, and an aqueduct helps against drought.',
+      'Katastrophen: Hochwasser, Dürren, Seuchen und Viehseuchen treffen ganze Gegenden, nicht nur ein Dorf. Die Chronik sagt, wie viele Menschen in welchen Dörfern gestorben sind. Medizin, Impfungen und Antibiotika machen Seuchen milder, und ein Aquädukt hilft gegen die Dürre.', 'add'],
+    ['Статистика с графики: население, родени и починали на година, родове, села и царства, открития и жертви на бедствия във времето.',
+      'Statistics with charts: population, births and deaths per year, clans, villages and kingdoms, discoveries and disaster deaths over time.',
+      'Statistik mit Diagrammen: Bevölkerung, Geburten und Todesfälle pro Jahr, Clans, Dörfer und Königreiche, Entdeckungen und Todesopfer von Katastrophen im Lauf der Zeit.', 'add'],
+    ['Звуци: чуваш мястото под камерата. Над водата тече река или шумят вълни, над селото има глъч, чук и огън нощем. Над полето пеят птици, а нощем щурци, и животните наоколо се обаждат. Колкото по-високо е камерата, толкова повече звуците се сливат и заглъхват. Бутон „Звук“ ги спира.',
+      'Sounds: you hear the place under the camera. Over the water a river babbles or waves roll, over a village there is a murmur, a hammer and the fire at night. Birds sing over the fields, crickets at night, and the animals nearby call. The higher the camera, the more the sounds blend and fade. The “Sound” button turns them off.',
+      'Geräusche: Du hörst den Ort unter der Kamera. Über dem Wasser plätschert ein Fluss oder rauschen Wellen, über einem Dorf gibt es Stimmengewirr, einen Hammer und nachts das Feuer. Über den Feldern singen Vögel, nachts Grillen, und die Tiere ringsum rufen. Je höher die Kamera, desto mehr verschwimmen und verklingen die Geräusche. Der Knopf „Ton“ schaltet sie aus.', 'add'],
+    ['Хората вече не тръгват всички в един и същи миг: всеки потегля малко по-рано или по-късно.',
+      'People no longer all set off at the same moment: each one starts a little earlier or later.',
+      'Die Menschen gehen nicht mehr alle im selben Augenblick los: Jeder bricht etwas früher oder später auf.', 'fix'],
+    ['Светът се отваря по-бързо: картинките са три пъти по-малки, а данните идват компресирани и наведнъж.',
+      'The world opens faster: the pictures are three times smaller, and the data comes packed and all at once.',
+      'Die Welt öffnet sich schneller: Die Bilder sind dreimal kleiner, und die Daten kommen gepackt und alle auf einmal.', 'fix'],
+  ] },
   { v: '1.62', items: [
     ['Лодки по реките: който знае лодката, вече не заобикаля реката, а я прекосява бавно с кану, акостира и продължава по пътя си. През Средновековието кануто става дървена лодка с гребла, а в наши дни моторница.',
       'Boats on the rivers: once people know the boat, they no longer walk round a river but paddle slowly across in a canoe, land and go on their way. In the Middle Ages the canoe becomes a wooden rowing boat, and in our days a motorboat.',
