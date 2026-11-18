@@ -20,6 +20,20 @@ const TAG_ORDER: Tag[] = ['breaking', 'new', 'old'];
 
 /** newest first; a new version gets its own entry here */
 export const CHANGELOG: Release[] = [
+  { v: '1.62', items: [
+    ['Лодки по реките: който знае лодката, вече не заобикаля реката, а я прекосява бавно с кану, акостира и продължава по пътя си. През Средновековието кануто става дървена лодка с гребла, а в наши дни моторница.',
+      'Boats on the rivers: once people know the boat, they no longer walk round a river but paddle slowly across in a canoe, land and go on their way. In the Middle Ages the canoe becomes a wooden rowing boat, and in our days a motorboat.',
+      'Boote auf den Flüssen: Wer das Boot kennt, geht nicht mehr um den Fluss herum, sondern paddelt langsam im Kanu hinüber, legt an und geht seines Weges. Im Mittelalter wird aus dem Kanu ein hölzernes Ruderboot, heute ein Motorboot.', 'add'],
+    ['Риболов: рибарите стоят на брега на реката или езерото, а не сред нивите. Ловят с въдица, харпун или мрежа, а някои излизат с кану и хвърлят мрежа. Уловът се носи у дома на прът или в кошница. Във всяка епоха рибарите са облечени според времето си.',
+      'Fishing: fishers stand on the bank of a river or lake, not in the fields. They fish with a rod, a spear or a net, and some go out in a canoe to cast a net. The catch is carried home on a pole or in a basket. In every age the fishers wear the clothes of their time.',
+      'Fischfang: Die Fischer stehen am Ufer eines Flusses oder Sees, nicht mehr auf den Feldern. Sie fischen mit der Angel, dem Speer oder dem Netz, und manche fahren mit dem Kanu hinaus und werfen ein Netz aus. Der Fang wird an einer Stange oder im Korb nach Hause getragen. In jeder Epoche tragen die Fischer die Kleidung ihrer Zeit.', 'add'],
+    ['Големите села приемат малки съседни родове и села: щом има храна и място, хората се преместват при тях, а селата растат.',
+      'Big villages take in small clans and villages nearby: when there is food and room, people move in and the villages grow.',
+      'Große Dörfer nehmen kleine Clans und Dörfer aus der Nähe auf: Wenn es Essen und Platz gibt, ziehen die Menschen dorthin und die Dörfer wachsen.', 'add'],
+    ['В картата на голямо село вече се виждат имената на всички показани хора, а не само на първите 40.',
+      'The card of a big village now shows the names of all listed people, not only the first 40.',
+      'Die Karte eines großen Dorfes zeigt jetzt die Namen aller aufgeführten Menschen, nicht nur der ersten 40.', 'fix'],
+  ] },
   { v: '1.61', items: [
     ['Известни личности: 200 истински хора от историята, от Имхотеп до наши дни (учени, владетели, поети, светци, изобретатели), идват на света в годината, в която са родени, и си отиват на годините, на които са починали. Носят червена звезда и сами правят своите открития. Нов таб „Известни личности“: имената се появяват, когато човекът се роди.',
       'Famous people: 200 real people from history, from Imhotep to our days (scientists, rulers, poets, saints, inventors), come into the world in the year they were born and leave at the age they died. They wear a red star and make their own discoveries. New tab “Famous people”: a name shows once the person is born.',

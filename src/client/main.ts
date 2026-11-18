@@ -742,10 +742,10 @@ function showBand(b: BandView) {
     <div class="kpis"><div><span>${T('Хора', 'People', 'Menschen')}</span><b>${b.size}</b></div><div><span>${T('Деца', 'Children', 'Kinder')}</span><b>${kidsN}</b></div><div><span>${T('Запаси', 'Food', 'Vorräte')}</span><b>${b.food}</b></div></div>
     <h3>${T('Какво правят сега', 'What they are doing', 'Was sie gerade tun')}</h3><ul class="deeds">${[...tasks].sort((a, c) => c[1] - a[1]).map(([t, n]) => `<li>${n} ${esc(t)}</li>`).join('')}</ul>
     <h3>${T('Какво знаят', 'What they know', 'Was sie wissen')}</h3><div class="techs">${b.techs.map((t) => `<span class="pill">${esc(TECH(t))}</span>`).join('') || `<span class="muted">${T('Още нищо', 'Nothing yet', 'Noch nichts')}</span>`}</div>
-    <h3>${T('Хората', 'The people', 'Die Menschen')}</h3><div class="names">${members.slice(0, 60).map((p) => `<a href="#" data-person="${p[0]}">#${p[0]}</a>`).join(', ')}</div>`);
+    <h3>${T('Хората', 'The people', 'Die Menschen')}</h3><div class="names">${members.slice(0, 60).map((p) => `<a href="#" data-person="${p[0]}">…</a>`).join(', ')}${members.length > 60 ? ` ${T(`и още ${members.length - 60}`, `and ${members.length - 60} more`, `und ${members.length - 60} weitere`)}` : ''}</div>`);
   // names come from the server one by one; fill them in lazily
   const links = [...document.querySelectorAll<HTMLAnchorElement>('#cardBody .names a')];
-  links.slice(0, 40).forEach(async (a) => {
+  links.forEach(async (a) => {
     const d = await api<PersonDetail>(`/api/person/${a.dataset.person}`).catch(() => null);
     if (d) a.textContent = P(d.name);
   });

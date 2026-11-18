@@ -480,6 +480,43 @@ export class Simulation {
       : this.hasTech(b, 'aqueduct') ? 280 : this.hasTech(b, 'walls') ? 210 : 140;
   }
 
+  /** once a year a big, well fed village with room to grow takes in a small clan from nearby: wanderers who have
+   *  heard there is food there, or a tiny village next door that would rather live with the many */
+  private gatherVillages() {
+    const size = new Map<number, number>();
+    for (const p of this.s.people) size.set(p.bandId, (size.get(p.bandId) ?? 0) + 1);
+    const gone = new Set<number>();
+    const villages = this.s.bands.filter((b) => b.settled && (size.get(b.id) ?? 0) >= 50 && (b.fed ?? 1) >= 1.1)
+      .sort((a, b) => (size.get(b.id) ?? 0) - (size.get(a.id) ?? 0));
+    for (const t of villages) {
+      if (gone.has(t.id) || !this.rng.chance(0.08)) continue;
+      const ts = size.get(t.id) ?? 0;
+      const room = this.townLimit(t) * 0.75 - ts;
+      if (room < 10) continue;
+      const near = this.s.bands.filter((v) => {
+        if (v === t || gone.has(v.id) || this.isCapital(v)) return false;
+        const vs = size.get(v.id) ?? 0;
+        if (vs === 0 || vs > room) return false;
+        if (v.kingdom != null && t.kingdom != null && v.kingdom !== t.kingdom) return false;
+        return v.settled ? vs <= 25 && ts >= vs * 3 && dist(v, t) <= 5 : vs <= 30 && dist(v, t) <= 8;
+      });
+      if (!near.length) continue;
+      const v = this.rng.pick(near);
+      for (const p of this.s.people) if (p.bandId === v.id) { p.bandId = t.id; p.task = 'travel'; }
+      for (const tech of v.techs) this.addTech(t, tech);
+      t.food += v.food;
+      size.set(t.id, ts + (size.get(v.id) ?? 0));
+      gone.add(v.id);
+      this.emit('merge', 2, `${this.bandLabel(t, true)} прие при себе си ${this.bandLabel(v)}. Тук има храна и място за всички.`,
+        `${this.bandLabel(t, true)} прие при себе си ${this.bandLabel(v)}. Там има много храна!`, undefined, t.id, this.bRefs(v),
+        [`${this.bandEnLabel(v, true)} came to live in ${this.bandEnLabel(t)}. There is food and room for everyone there.`,
+          `${this.bandEnLabel(v, true)} moved to ${this.bandEnLabel(t)}. There is lots of food there!`],
+        [`${this.bDe(v, 'nom', true)} ließ sich ${this.bWith('in', t)} nieder. Dort gibt es Essen und Platz für alle.`,
+          `${this.bDe(v, 'nom', true)} wohnt jetzt ${this.bWith('in', t)}. Dort gibt es viel zu essen!`]);
+      this.removeBand(v, t);
+    }
+  }
+
   /** once a year a walled town swallows a small village right next to it: the village becomes a quarter of the town */
   private growTowns() {
     const size = new Map<number, number>();
@@ -1039,7 +1076,7 @@ export class Simulation {
     this.contact();
     if (this.month === 6) { this.buildRoads(); this.buildRails(); }
     if (this.month === 7) this.kingdoms();
-    if (this.month === 8) this.growTowns();
+    if (this.month === 8) { this.growTowns(); this.gatherVillages(); }
     if (this.s.tick % 6 === 0) this.explore();
     this.randomEvents(members);
     this.checkEra();
@@ -1207,9 +1244,19 @@ export class Simulation {
   private placeWorker(p: Person, b: Band, tile: number) {
     let x = tile % W, y = Math.floor(tile / W);
     if (p.task === 'fish') {
-      // walk to the nearest water
-      const near = this.findNear(b, 8, (i) => this.t.fish[i] > 0);
-      if (near >= 0) { x = near % W; y = Math.floor(near / W); }
+      // walk to a bank of a river or a lake (not out into the fields where a stream only feeds the fish)
+      const wetAt = (j: number) => j >= 0 && j < W * H && !this.walkable(j);
+      const near = this.findNear(b, 8, (i) => this.walkable(i) && (wetAt(i + 1) || wetAt(i - 1) || wetAt(i + W) || wetAt(i - W)));
+      if (near >= 0) {
+        x = near % W; y = Math.floor(near / W);
+        // at the very edge, facing the water
+        const [ex, ey] = wetAt(near + 1) ? [1, 0] : wetAt(near - 1) ? [-1, 0] : wetAt(near + W) ? [0, 1] : [0, -1];
+        p.x = x + ex * 0.3 + this.rng.range(-0.15, 0.15);
+        p.y = y + ey * 0.3 + this.rng.range(-0.15, 0.15);
+        return;
+      }
+      // no bank close by: fish from home, where the trap is
+      x = Math.round(b.cx); y = Math.round(b.cy);
     } else if (p.task === 'farm' || p.task === 'herd') {
       const fx = Math.round(b.cx + this.rng.range(-3, 3)), fy = Math.round(b.cy + this.rng.range(-3, 3));
       if (this.reachable(b, fx, fy)) { x = fx; y = fy; }

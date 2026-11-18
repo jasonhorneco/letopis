@@ -4,6 +4,7 @@ import {
 import { Simplex } from '../shared/noise';
 import { Fauna } from './animals';
 import { Fleet } from './ships';
+import { Canoes } from './canoes';
 import { Trains } from './trains';
 import { SECRET_KINDS, SecretSpot, secretSpots } from '../shared/secrets';
 import { B, VILLAGE } from './lang';
@@ -233,6 +234,7 @@ export class WorldRenderer {
   camps = new Map<number, CampSprite>();
   fauna = new Fauna(this);
   fleet = new Fleet(this);
+  canoes = new Canoes(this);
   trains = new Trains(this);
   /** the 100 hidden secrets: tiny, half see-through, buried by snow in winter */
   secrets: { spot: SecretSpot; s: Sprite; i: number; found: boolean }[] = [];
@@ -960,6 +962,7 @@ export class WorldRenderer {
     if (this.info) this.updateCleared();
     this.fauna.updateBands(bands);
     this.fleet.updateBands(bands);
+    this.canoes.updateBands(bands);
     this.trains.updateBands(bands);
     this.updateRealms(bands);
   }
@@ -1294,6 +1297,7 @@ export class WorldRenderer {
     }
     this.fauna.frame(performance.now(), Math.min(0.1, dt / 60));
     this.fleet.frame(performance.now(), Math.min(0.1, dt / 60));
+    this.canoes.frame(performance.now(), Math.min(0.1, dt / 60));
     this.trains.frame(performance.now(), Math.min(0.1, dt / 60));
     this.secretFrame(nowMs, zoom, winter);
   }
@@ -1321,6 +1325,8 @@ export class PersonSprite {
   tile = { x: 0, y: 0 };
   path: { x: number; y: number }[] = [];
   lens: number[] = [];
+  /** the same path in tile points: to see where it runs over water */
+  tpath: { x: number; y: number }[] = [];
   t0 = 0;
   dur = 1;
   seed: number;
@@ -1336,6 +1342,8 @@ export class PersonSprite {
   star: Sprite | null = null;
   /** a famous person of the real world */
   fame = false;
+  /** walking back towards the camp (a fisher brings the catch home) */
+  homeward = false;
   /** set by the renderer: the night guard of the band, the old storyteller, or the child listening to him */
   role: Role | null = null;
 
@@ -1442,7 +1450,7 @@ export class PersonSprite {
     const m = /^([a-z0-9]+?)(\d*)$/.exec(name);
     if (!m) return name;
     // from the early modern age on nobody hunts or fishes with a spear in town any more: they just stand there
-    const late = this.dressP >= 'e5' ? LATE_DRESS[m[1]] : undefined;
+    const late = (this.dressP >= 'e5' ? LATE_DRESS[m[1]] : undefined) ?? OLD_ONLY[m[1]];
     const base = late ?? DRESS[m[1]];
     if (!base) return name;
     const dressed = `${this.dressP}${base}${late ? '' : m[2]}`;
@@ -1555,12 +1563,25 @@ export class PersonSprite {
     if ((this.role === 'guard' || this.role === 'bodyguard') && A.has(`${this.guardKit()}idle0`)) return loop(`${this.guardKit()}idle`, 8, 450);
     if (this.role === 'teller') return loop('tell', 8, 240);
     if (this.role === 'listener') return loop('listen', 8, 240);
+    // a fisher on the way back to camp carries the catch home
+    if (walking && task === 'fish' && this.homeward && this.age >= 14 && this.age <= 55) {
+      const c = loop(this.female ? 'fishbasket' : 'fishcarry', 4, 150);
+      if (c) return c;
+    }
     if (!arrived) return null;
     switch (task) {
       case 'chop': return loop('chop', 8, 120);
       case 'hunt': return this.age < 56 ? loop('throw', 4, 320) : null;
       case 'gather': return this.female && this.age < 56 ? loop('pick', 4, 340) : null;
-      case 'fish': return !this.female ? loop('spearfish', 4, 340) : null;
+      case 'fish': {
+        // women fish with a rod from the bank; men with a rod, a net in the shallows or the old harpoon (sheets CS, CT)
+        if (this.female) return loop('rodfishf', 4, 520);
+        const how = hash(this.id, 161);
+        // from the bronze age on the men fish with a rod in the clothes of their time
+        if (how < 0.4 || knows('bronze')) { const c = loop('rodfish', 4, 520); if (c) return c; }
+        if (how > 0.8) { const c = loop('netpull', 4, 320); if (c) return c; }
+        return loop('spearfish', 4, 340);
+      }
       case 'craft':
         if (knows('moon_base')) {
           if (knows('robots') && hash(this.id, 151) < 0.25) { const c = loop('technician', 4, 500); if (c) return c; }
@@ -1624,10 +1645,30 @@ export class PersonSprite {
     this.from = { x: this.pos.x, y: this.pos.y };
     this.to = p;
     // go around water; with no way by land (a boat) they still go straight
-    const way = this.r.dryLine(this.tile.x, this.tile.y, tx, ty) ? null : this.r.landPath(this.tile.x, this.tile.y, tx, ty);
-    this.path = way ? [this.from, ...way.slice(1, -1).map((q) => this.r.tileTop(q.x, q.y)), p] : [this.from, p];
+    let way = this.r.dryLine(this.tile.x, this.tile.y, tx, ty) ? null : this.r.landPath(this.tile.x, this.tile.y, tx, ty);
+    // with boats a long walk round the water is not worth it: they paddle straight across
+    if (way && this.r.bandTech.get(row[4])?.has('boats')) {
+      let len = 0;
+      for (let i = 1; i < way.length; i++) len += Math.hypot(way[i].x - way[i - 1].x, way[i].y - way[i - 1].y);
+      if (len > Math.hypot(tx - this.tile.x, ty - this.tile.y) * 1.8 + 3) way = null;
+    }
+    this.tpath = way ? [{ x: this.tile.x, y: this.tile.y }, ...way.slice(1, -1), { x: tx, y: ty }] : [{ x: this.tile.x, y: this.tile.y }, { x: tx, y: ty }];
+    const boats = !!this.r.bandTech.get(row[4])?.has('boats');
+    if (boats && !way && !this.r.dryLine(this.tile.x, this.tile.y, tx, ty)) {
+      // in short steps, so the time on the water can be counted apart
+      const n = Math.max(2, Math.ceil(Math.hypot(tx - this.tile.x, ty - this.tile.y) * 2));
+      this.tpath = Array.from({ length: n + 1 }, (_, i) => ({ x: this.tile.x + (tx - this.tile.x) * i / n, y: this.tile.y + (ty - this.tile.y) * i / n }));
+    }
+    this.path = this.tpath.map((q, i) => (i === 0 ? this.from : i === this.tpath.length - 1 ? p : this.r.tileTop(q.x, q.y)));
+    const camp = this.r.camps.get(row[4]);
+    this.homeward = !!camp && Math.hypot(tx - camp.tx, ty - camp.ty) + 0.5 < Math.hypot(this.tile.x - camp.tx, this.tile.y - camp.ty);
     this.lens = [0];
-    for (let i = 1; i < this.path.length; i++) this.lens.push(this.lens[i - 1] + Math.hypot(this.path[i].x - this.path[i - 1].x, this.path[i].y - this.path[i - 1].y));
+    for (let i = 1; i < this.path.length; i++) {
+      // paddling is slow: the water counts three times, so the crossing can be seen
+      const a = this.tpath[i - 1], b = this.tpath[i];
+      const wet = boats && !this.r.walkable(Math.round((a.x + b.x) / 2), Math.round((a.y + b.y) / 2));
+      this.lens.push(this.lens[i - 1] + Math.hypot(this.path[i].x - this.path[i - 1].x, this.path[i].y - this.path[i - 1].y) * (wet ? 3 : 1));
+    }
     this.tile = { x: tx, y: ty };
     this.t0 = performance.now();
     this.dur = Math.max(400, Math.min(tickMs * 0.85, 12000));
@@ -1648,6 +1689,7 @@ export class PersonSprite {
     const k = Math.min(1, (performance.now() - this.t0) / this.dur);
     const e = k * k * (3 - 2 * k);
     let x = this.to.x, y = this.to.y;
+    let afloat: string | null = null;
     const total = this.lens[this.lens.length - 1] ?? 0;
     if (total > 0 && e < 1) {
       const d = e * total;
@@ -1658,6 +1700,17 @@ export class PersonSprite {
       x = a.x + (b.x - a.x) * f;
       y = a.y + (b.y - a.y) * f;
       if (Math.abs(b.x - a.x) > 1) this.facing = b.x < a.x ? -1 : 1;
+      const ta = this.tpath[i - 1], tb = this.tpath[i];
+      if (ta && tb) {
+        const wx = Math.round(ta.x + (tb.x - ta.x) * f), wy = Math.round(ta.y + (tb.y - ta.y) * f);
+        // over water with a boat: in the canoe (towards us or away)
+        const t = this.r.bandTech.get(this.band);
+        if (!this.r.walkable(wx, wy) && t?.has('boats')) {
+          // dugout, then a rowing boat (middle ages), then a motorboat (computer age)
+          const boat = t.has('computer') && this.r.atlas.has('motorse0') ? 'motor' : t.has('heavy_plough') && this.r.atlas.has('skiffse0') ? 'skiff' : 'canoe';
+          if (this.r.atlas.has(`${boat}se0`)) afloat = `${boat}${b.y < a.y ? 'ne' : 'se'}`;
+        }
+      }
     }
     const dist = total;
     // a guard on his night round: two tiles around the fire
@@ -1680,7 +1733,9 @@ export class PersonSprite {
     const guardWalk = round || (guardOn && walking) ? `${own ? `${kit}walk` : this.female ? 'womanwalk' : 'walk'}${Math.floor(now / 150 + this.seed) % (own ? 8 : 4)}` : null;
     const special = chiefPose || guardWalk ? null : this.actionPose(now, walking, k >= 1);
     const walk = guardWalk ?? chiefPose ?? special ?? (walking ? this.walkPose(now) : null);
-    if (walk) {
+    if (afloat) {
+      this.setPose(`${afloat}${Math.floor(now / 380 + this.seed) % 4}`);
+    } else if (walk) {
       this.setPose(walk);
     } else {
       this.setPose(this.idlePose());
@@ -1712,9 +1767,14 @@ const DRESS: Record<string, string> = {
   gatherer: 'gatherer', reedcarrier: 'gatherer', carrier: 'carrier', woman2: 'woman2',
   oldwoman: 'oldwoman', oldherbs: 'oldwoman', oldscarf: 'oldwoman', oldbasket: 'oldwoman',
   boy: 'boy', girl: 'girl', kidwave: 'kidwave', kidtoy: 'kidtoy', kidberries: 'girl', kidpuppy: 'kidwave', kidstick: 'kidtoy', kidfish: 'boy',
+  rodfish: 'rodfish', fishbasket: 'fishbasket', fishcarry: 'walk',
 };
 /** stone age work with spears and flint, shown as a dressed pose from the early modern age on */
-const LATE_DRESS: Record<string, string> = { throw: 'man', spearfish: 'carrier', pick: 'gatherer', knap: 'man' };
+const LATE_DRESS: Record<string, string> = {
+  throw: 'man', spearfish: 'carrier', pick: 'gatherer', knap: 'man',
+};
+/** stone age poses with no sheet of their own in the later ages: from the bronze age on a plain dressed pose */
+const OLD_ONLY: Record<string, string> = { rodfishf: 'woman', netpull: 'carrier' };
 
 // Props a band shows in its camp once it knows the matching technology.
 const PROPS: [string, string, boolean | null][] = [
