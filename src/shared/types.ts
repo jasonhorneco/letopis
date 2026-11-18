@@ -116,8 +116,8 @@ export interface BandView {
   kingdom?: { id: number; place: string; capital: boolean; members: number; color: number; founded: number; allies?: string[]; kings?: { id: number; name: string; from: number; to: number | null }[] } | null;
 }
 
-/** compact person: [id, x*10, y*10, taskIndex, bandId, ageYears, sex(0 m,1 f), chief(1) or not(0)] */
-export type PersonRow = [number, number, number, number, number, number, number, number];
+/** compact person: [id, x*10, y*10, taskIndex, bandId, ageYears, sex(0 m,1 f), chief(1) or not(0), famous (index + 1) or 0] */
+export type PersonRow = [number, number, number, number, number, number, number, number, number?];
 
 export const TASKS: Task[] = ['rest', 'gather', 'hunt', 'fish', 'craft', 'farm', 'herd', 'build', 'child', 'elder', 'travel', 'lead', 'scout', 'chop'];
 

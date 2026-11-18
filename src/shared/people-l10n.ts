@@ -1,3 +1,4 @@
+import { famousByName } from './famous';
 // People and places as English and German speakers would name them.
 // The world is simulated with Bulgarian names; every name has its own English and German counterpart
 // (not a transliteration): Иван Петров is John Peterson in English and Johann Petersen in German.
@@ -141,6 +142,8 @@ export const isWoman = (name: string) => isFemaleName(name.split(' ')[0]);
  */
 export function personName(name: string, lang: NameLang, fallback: (s: string) => string): string {
   if (!name) return name;
+  const fam = famousByName(name);
+  if (fam) return lang === 'en' ? fam.en : lang === 'de' ? fam.de : fam.bg;
   const sp = name.indexOf(' ');
   const first = sp < 0 ? name : name.slice(0, sp);
   const rest = sp < 0 ? '' : name.slice(sp + 1);

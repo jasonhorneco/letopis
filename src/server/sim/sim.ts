@@ -5,7 +5,8 @@ import {
 import { Terrain, generateTerrain, findStart, idx, inBounds, W, H, setWorldSize, OLD_SIZE, NEW_SIZE } from './world';
 import { SECRET_COUNT, SECRET_HEROES, SECRET_KINDS, SecretFind } from '../../shared/secrets';
 import { FEMALE, MALE, bandColor, bandName, fixBandName, familyFrom, nickname, placeName } from './names';
-import { ERAS, TECHS, TECH_BY_ID, Tech, eraOf } from './tech';
+import { ERAS, TECHS, TECH_BY_ID, Tech, eraOf, techOpen } from './tech';
+import { FAMOUS, fameRole } from '../../shared/famous';
 import { BIG, startStage, treeKinds } from '../../shared/trees';
 import { findRoad } from './roads';
 import { BEAST_EN, ERAS_EN, FEATURE_EN, SECRET_HEROES_EN, SECRET_KINDS_EN, TECH_EN, bandEn, bandLabelEn, bandThe, villageEn, causeEn, chiefEn, deedEn, personEn, translit } from '../../shared/i18n';
@@ -61,6 +62,8 @@ export interface Person {
   deeds: string[];
   gen: number;
   lastBirth: number; // tick of last child (women)
+  /** a famous person of the real world: index in FAMOUS + 1 */
+  fame?: number;
 }
 
 export interface Band {
@@ -131,6 +134,8 @@ export interface SimState {
   era: number;
   startedAt: number;
   milestone: number;
+  /** famous people born in this world: index in FAMOUS, person id, their band, year of death */
+  famous?: { i: number; id: number; band: string; died?: number }[];
   plants: number[]; // terrain resource state (rounded)
   game: number[];
   explored: string; // base64
@@ -855,13 +860,14 @@ export class Simulation {
     // early names come from the older part of the list
     const pool = this.s.era < 2 ? names.slice(0, 40) : names;
     let first = this.rng.pick(pool);
-    if (father && this.rng.chance(0.15)) first = sex === 0 ? father.first : first; // named after the father
+    const fatherFirst = father ? (father.fame ? father.first.replace(/^(Цар|Хан|Свети|Кралица|Патриарх) /, '').split(' ')[0] : father.first) : '';
+    if (father && this.rng.chance(0.15)) first = sex === 0 ? fatherFirst : first; // named after the father
     const hasFamilies = this.s.era >= 1 && father;
     const p: Person = {
       id: this.s.nextPersonId++,
       first,
       nick: hasFamilies ? null : nickname(this.rng, sex === 1, top),
-      family: hasFamilies ? familyFrom(father!.first, sex === 1) : null,
+      family: hasFamilies ? familyFrom(fatherFirst, sex === 1) : null,
       sex,
       born: bornTick,
       motherId: mother?.id ?? null,
@@ -1027,6 +1033,7 @@ export class Simulation {
       this.discover(b, m);
     }
     this.lifeAndDeath(members);
+    this.famousBirths(members);
     if (this.month === 3) this.pairing(members);
     this.bandDynamics(members);
     this.contact();
@@ -1139,7 +1146,7 @@ export class Simulation {
           if (this.hasTech(b, 'dog')) mult *= 1.15;
           if (this.hasTech(b, 'horse')) mult *= 1.15;
           huntWant += mult * (0.6 + season * 0.4);
-          if (this.rng.chance(this.hasTech(b, 'spear') ? 0.0002 : 0.0004)) this.die(p, 'загина на лов', m);
+          if (!p.fame && this.rng.chance(this.hasTech(b, 'spear') ? 0.0002 : 0.0004)) this.die(p, 'загина на лов', m);
           break;
         }
         case 'fish': got = 1.4 * skill * (this.hasTech(b, 'boats') ? 1.3 : 1) * (this.hasTech(b, 'sailing') ? 1.25 : 1) * (this.hasTech(b, 'harbor') ? 1.15 : 1) * (0.7 + season * 0.3); break;
@@ -1263,8 +1270,10 @@ export class Simulation {
   private discover(b: Band, m: Person[]) {
     const known = this.techSets.get(b.id)!;
     const candidates: Tech[] = [];
+    const worldEra = Math.max(this.s.era, eraOf(known));
     for (const tech of TECHS) {
       if (known.has(tech.id)) continue;
+      if (!techOpen(tech, worldEra)) continue;
       if (!tech.prereq.every((r) => known.has(r))) continue;
       if (tech.need && !this.areaHas(b, b.settled ? 5 : 7, tech.need)) continue;
       candidates.push(tech);
@@ -1274,8 +1283,9 @@ export class Simulation {
     if (!adults.length) return;
     const crowd = Math.sqrt(adults.length / 8);
     for (const tech of candidates) {
-      // the person who might have the idea this month
-      const p = this.rng.pick(adults);
+      // the person who might have the idea this month: a famous one makes their own discovery
+      const star = this.year >= tech.target - 5 ? adults.find((q) => q.fame && FAMOUS[q.fame - 1].tech === tech.id && this.ageOf(q) >= 18) : undefined;
+      const p = star ?? this.rng.pick(adults);
       const g = p.genes[tech.gene] * 0.5 + p.genes.int * 0.25 + p.genes.cur * 0.25;
       // already known somewhere else: rediscovery is easier
       const seen = this.s.discovered.includes(tech.id);
@@ -1284,7 +1294,8 @@ export class Simulation {
       const world = seen ? 1 : Math.min(1, 4 / this.s.bands.length);
       const written = (this.hasTech(b, 'alphabet') ? 1.3 : this.hasTech(b, 'writing') ? 1.15 : 1) * (this.hasTech(b, 'library') ? 1.2 : 1)
         * (this.hasTech(b, 'monastery') ? 1.15 : 1) * (this.hasTech(b, 'university') ? 1.2 : 1) * (this.hasTech(b, 'academy') ? 1.2 : 1) * (this.hasTech(b, 'school') ? 1.2 : 1) * (this.hasTech(b, 'computer') ? 1.2 : 1) * (this.hasTech(b, 'ai') ? 1.25 : 1);
-      const chance = written * world * GLOBAL_DISCOVERY * Math.sqrt(tech.base / 0.0025) * this.techPace(tech) * again * crowd * Math.pow(g * 2, 2);
+      const chance = star ? 0.08 * Math.max(1, this.techPace(tech))
+        : written * world * GLOBAL_DISCOVERY * Math.sqrt(tech.base / 0.0025) * this.techPace(tech) * again * crowd * Math.pow(g * 2, 2);
       if (!this.rng.chance(chance)) continue;
       this.addTech(b, tech.id);
       const first = !this.s.discovered.includes(tech.id);
@@ -1341,6 +1352,44 @@ export class Simulation {
         `${bandLabelDe(b.name, null, 'nom', true)} hat ein Dorf gebaut und es ${villageDe(b.settlementName)} genannt!`]);
   }
 
+  /** famous people come into the world in the year they were born in reality, in a band with a young mother */
+  private famousBirths(members: Map<number, Person[]>) {
+    const year = Math.floor(this.year);
+    for (let i = 0; i < FAMOUS.length; i++) {
+      const f = FAMOUS[i];
+      // never in January: someone who died before their birthday must still be the right age in the January of that year
+      if (f.born !== year || this.month !== Math.max(1, (i * 5) % 12)) continue;
+      if ((this.s.famous ??= []).some((r) => r.i === i)) continue;
+      const mothers: [Band, Person][] = [];
+      for (const b of this.s.bands) for (const q of members.get(b.id) ?? []) {
+        const a = this.ageOf(q);
+        if (q.sex === 1 && q.partnerId && a >= 17 && a <= 40 && this.byId.has(q.id) && this.byId.has(q.partnerId)) mothers.push([b, q]);
+      }
+      if (!mothers.length) continue;
+      const [b, mother] = this.rng.pick(mothers);
+      const father = this.byId.get(mother.partnerId!) ?? null;
+      const p = this.newPerson(b, mother, father, this.s.tick, f.sex);
+      p.first = f.bg; p.nick = null; p.family = null; p.fame = i + 1;
+      p.genes.int = Math.max(p.genes.int, 0.8); p.genes.cur = Math.max(p.genes.cur, 0.8);
+      p.x = mother.x; p.y = mother.y;
+      mother.children.push(p.id); father?.children.push(p.id);
+      mother.lastBirth = this.s.tick;
+      members.get(b.id)?.push(p);
+      this.s.famous.push({ i, id: p.id, band: this.bandLabel(b, true) });
+      const he = f.sex ? 'я' : 'го';
+      this.emit('famous', 3, `★ В ${this.bandLabel(b)} ${this.nameOf(mother)} роди ${f.sex ? 'дъщеря' : 'син'}: ${f.bg}${f.bg.endsWith('.') ? '' : '.'} Светът ще ${he} помни като ${fameRole(f, 'bg')}.`,
+        `★ В ${this.bandLabel(b)} се роди ${f.bg}! Някой ден всички ще ${he} познават.`, p.id, b.id, [this.pRef(mother)],
+        [`★ In ${this.bandEnLabel(b)}, ${this.nameEn(mother)} gave birth to a ${f.sex ? 'daughter' : 'son'}: ${f.en}${f.en.endsWith('.') ? '' : '.'} The world will remember ${f.sex ? 'her' : 'him'} as ${/^[aeiou]/.test(fameRole(f, 'en')) ? 'an' : 'a'} ${fameRole(f, 'en')}.`,
+          `★ ${f.en} was born in ${this.bandEnLabel(b)}! One day everybody will know ${f.sex ? 'her' : 'him'}.`],
+        [`★ ${this.bWith('in', b, true)} brachte ${this.nameDe(mother)} ${f.sex ? 'eine Tochter' : 'einen Sohn'} zur Welt: ${f.de}${f.de.endsWith('.') ? '' : '.'} Die Welt wird ${f.sex ? 'sie' : 'ihn'} als ${fameRole(f, 'de')} in Erinnerung behalten.`,
+          `★ ${this.bWith('in', b, true)} wurde ${f.de} geboren! Eines Tages werden alle ${f.sex ? 'sie' : 'ihn'} kennen.`]);
+    }
+  }
+
+  famousList(): { i: number; id: number; band: string; died?: number }[] {
+    return this.s.famous ?? [];
+  }
+
   private lifeAndDeath(members: Map<number, Person[]>) {
     // a gentle hand that keeps a tiny humanity from vanishing too early
     const pop = this.s.people.length;
@@ -1370,8 +1419,14 @@ export class Simulation {
         else q = 0.012 + 0.00055 * Math.exp(0.09 * (a - 10 * (lon - 0.5) * 2));
         q *= medicine * settledDisease * (1.3 - hea * 0.6) * guardian;
         let pm = q / 12 + guardian * coldRisk * (a < 5 || a > 55 ? 2 : 1) + hungry * 0.015 * (a < 5 || a > 55 ? 2 : 0.6);
+        if (p.fame) {
+          // a famous person lives exactly as long as in reality
+          const f = FAMOUS[p.fame - 1];
+          // the right age, and in the year of death they really died in (the world has a year 0, history does not)
+          pm = a >= f.age && (f.born < 0 && f.died > 0 || Math.floor(this.year) >= f.died) ? 1 : 0;
+        }
         if (this.rng.chance(pm)) {
-          const cause = hungry > 0.25 && this.rng.chance(0.6) ? 'почина в гладна година'
+          const cause = p.fame ? (a >= 60 ? 'почина от старост' : 'почина от болест') : hungry > 0.25 && this.rng.chance(0.6) ? 'почина в гладна година'
             : coldRisk > 0.004 && this.rng.chance(0.5) ? 'почина в лютата зима'
             : a > 55 ? 'почина от старост' : a < 5 ? 'почина като дете' : 'почина от болест';
           this.die(p, cause, m);
@@ -1445,7 +1500,17 @@ export class Simulation {
     const nE = this.nameEn(p), he = p.sex ? 'she' : 'he', ofB = b ? this.bandEnLabel(b) : 'the clan';
     const nD = this.nameDe(p), er = p.sex ? 'sie' : 'er', ausB = b ? this.bWith('aus', b) : 'aus dem Clan';
     const found = p.deeds.find((d) => d.startsWith('Откри'));
-    if (found) {
+    if (p.fame) {
+      const f = FAMOUS[p.fame - 1];
+      const rec = this.s.famous?.find((r) => r.id === p.id);
+      if (rec) rec.died = Math.floor(this.year);
+      this.emit('famous', 3, `★ ${this.nameOf(p)} ${cause} на ${age} години. Светът ще ${p.sex ? 'я' : 'го'} помни като ${fameRole(f, 'bg')}.`,
+        `★ ${this.nameOf(p)} си отиде на ${age} години. Всички ще ${p.sex ? 'я' : 'го'} помнят.`, p.id, p.bandId, me,
+        [`★ ${nE} ${causeEn(cause)} at ${age}. The world will remember ${p.sex ? 'her' : 'him'} as ${/^[aeiou]/.test(fameRole(f, 'en')) ? 'an' : 'a'} ${fameRole(f, 'en')}.`,
+          `★ ${nE} passed away at ${age}. Everyone will remember ${p.sex ? 'her' : 'him'}.`],
+        [`★ ${nD} ${causeDe(cause, age)}. Die Welt wird ${p.sex ? 'sie' : 'ihn'} als ${fameRole(f, 'de')} in Erinnerung behalten.`,
+          `★ ${nD} ist mit ${age} Jahren gestorben. Alle werden sich an ${p.sex ? 'sie' : 'ihn'} erinnern.`]);
+    } else if (found) {
       this.emit('death', 2, `${this.nameOf(p)} ${cause} на ${age} години. Родът ще помни, че тя/той ${found.toLowerCase()}.`.replace('тя/той', p.sex ? 'тя' : 'той'),
         `${this.nameOf(p)} си отиде на ${age} години. Всички помнят какво е открил${p.sex ? 'а' : ''}.`, p.id, p.bandId, me,
         [`${nE} ${causeEn(cause)} at ${age}. The clan will remember that ${he} ${deedEn(found).replace(/^D/, 'd')}.`,
@@ -2057,7 +2122,7 @@ export class Simulation {
   personRows(): PersonRow[] {
     const chiefs = new Set(this.s.bands.map((b) => b.chiefId));
     return this.s.people.map((p) => [
-      p.id, Math.round(p.x * 10), Math.round(p.y * 10), TASKS.indexOf(p.task), p.bandId, Math.floor(this.ageOf(p)), p.sex, chiefs.has(p.id) ? 1 : 0,
+      p.id, Math.round(p.x * 10), Math.round(p.y * 10), TASKS.indexOf(p.task), p.bandId, Math.floor(this.ageOf(p)), p.sex, chiefs.has(p.id) ? 1 : 0, p.fame ?? 0,
     ]);
   }
 

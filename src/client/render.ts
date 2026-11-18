@@ -283,6 +283,10 @@ export class WorldRenderer {
       star: g((x) => {
         x.star(8, 8, 5, 7, 3).fill(0xffd34d).stroke({ color: 0x6b4a10, width: 1.2 });
       }),
+      // red star over the famous people of the real world
+      redstar: g((x) => {
+        x.star(9, 9, 5, 8, 3.4).fill(0xff2a2a).stroke({ color: 0x5a0a0a, width: 1.4 });
+      }),
       glow: g((x) => {
         for (let i = 10; i > 0; i--) x.circle(40, 40, i * 4).fill({ color: 0xff8a2a, alpha: 0.035 });
       }),
@@ -1037,7 +1041,7 @@ export class WorldRenderer {
     const shown: PersonRow[] = [];
     for (const l of byBand.values()) {
       if (l.length <= PER_BAND) { shown.push(...l); continue; }
-      const rank = (r: PersonRow) => (r[7] === 1 || r[0] === this.selectedId || roles.has(r[0]) ? -1 : hash(r[0], 99));
+      const rank = (r: PersonRow) => (r[7] === 1 || r[8] || r[0] === this.selectedId || roles.has(r[0]) ? -1 : hash(r[0], 99));
       l.sort((a, b) => rank(a) - rank(b));
       shown.push(...l.slice(0, PER_BAND));
     }
@@ -1330,6 +1334,8 @@ export class PersonSprite {
   facing = 1;
   outline: Container | null = null;
   star: Sprite | null = null;
+  /** a famous person of the real world */
+  fame = false;
   /** set by the renderer: the night guard of the band, the old storyteller, or the child listening to him */
   role: Role | null = null;
 
@@ -1350,19 +1356,25 @@ export class PersonSprite {
     this.tile = { x: row[1] / 10, y: row[2] / 10 };
     this.c.position.set(p.x, p.y);
     this.age = row[5];
+    this.fame = !!row[8];
     this.female = row[6] === 1;
     this.chief = row[7] === 1;
     this.setPose(this.idlePose());
     this.updateStar();
   }
 
-  /** 70 and more: a small gold star next to the head */
+  /** 70 and more: a small gold star next to the head; a famous person of the real world: a bigger red one */
   private updateStar() {
-    const want = this.age >= 70;
+    const want = this.age >= 70 || this.fame;
+    const tex = this.fame ? this.r.tex.redstar : this.r.tex.star;
+    if (this.star && this.star.texture !== tex) {
+      this.star.destroy();
+      this.star = null;
+    }
     if (want && !this.star) {
-      this.star = new Sprite(this.r.tex.star);
+      this.star = new Sprite(tex);
       this.star.anchor.set(0.5);
-      this.star.scale.set(0.25);
+      this.star.scale.set(this.fame ? 0.32 : 0.25);
       this.c.addChild(this.star);
     } else if (!want && this.star) {
       this.star.destroy();
@@ -1621,6 +1633,7 @@ export class PersonSprite {
     this.dur = Math.max(400, Math.min(tickMs * 0.85, 12000));
     this.cloth.tint = color;
     this.age = row[5];
+    this.fame = !!row[8];
     this.updateStar();
     this.female = row[6] === 1;
     this.chief = row[7] === 1;

@@ -233,11 +233,14 @@ export const TECH_BG: Record<string, string> = {
   'Компютър': 'computer', 'Телевизия': 'television', 'Атомна енергия': 'nuclear_power', 'Ракета': 'rocket', 'Реактивен самолет': 'jet', 'Лазер': 'laser', 'Зелена революция': 'green_revolution', 'Човек на Луната': 'moon_landing', 'Микрочип': 'microchip', 'Мобилен телефон': 'mobile_phone', 'Интернет': 'internet', 'Слънчева енергия': 'solar_power', 'Геном': 'genome', 'Смартфон': 'smartphone', 'Електромобил': 'electric_car', 'Роботи': 'robots', 'Изкуствен интелект': 'ai', 'Лунна база': 'moon_base', 'Вертикална ферма': 'vertical_farm', 'Магнитен влак': 'maglev', 'Термоядрен синтез': 'fusion', 'Генна терапия': 'gene_therapy', 'Колония на Марс': 'mars_colony', 'Дивата природа се връща': 'rewilding', 'Летяща кола': 'flying_car', 'Добив от астероиди': 'asteroid_mining', 'Космически асансьор': 'space_elevator', 'Тераформиране': 'terraforming', 'Звезден кораб': 'starship',
 };
 /** every discovery the game knows, in the order history found them: [id, Bulgarian name, era] */
+/** the discovery that opens each age (index = age) */
+export const ERA_GATE = ['', 'agriculture', 'bronze', 'iron', 'heavy_plough', 'caravel', 'steam_engine', 'computer', 'moon_base'];
+
 export const TECH_LIST: [string, string, number][] = [
   ['fire', 'Огън', 0], ['stone_tools', 'Каменни сечива', 0], ['burial', 'Погребални обреди', 0], ['spear', 'Копие', 0],
   ['herb_lore', 'Познание за билките', 0], ['clothing', 'Облекло от кожи', 0], ['cave_art', 'Скални рисунки', 0], ['shelter', 'Шатри', 0],
-  ['fishing', 'Риболов', 0], ['dog', 'Опитомено куче', 0], ['bow', 'Лък и стрели', 0], ['boats', 'Лодка от дънер', 1],
-  ['grinding', 'Мелене на зърно', 1], ['pottery', 'Керамика', 1], ['herding', 'Скотовъдство', 1], ['agriculture', 'Земеделие', 1],
+  ['fishing', 'Риболов', 0], ['dog', 'Опитомено куче', 0], ['bow', 'Лък и стрели', 0], ['boats', 'Лодка от дънер', 0],
+  ['grinding', 'Мелене на зърно', 0], ['pottery', 'Керамика', 0], ['herding', 'Скотовъдство', 1], ['agriculture', 'Земеделие', 1],
   ['weaving', 'Тъкане', 1], ['mudbrick', 'Глинени къщи', 1], ['copper', 'Мед', 1], ['plough', 'Рало', 1], ['wheel', 'Колело', 1],
   ['bronze', 'Бронз', 2], ['sailing', 'Платно', 2], ['writing', 'Писменост', 2], ['trade', 'Търговия', 2], ['walls', 'Крепостни стени', 2],
   ['calendar', 'Календар', 2], ['horse', 'Опитомен кон', 2],
