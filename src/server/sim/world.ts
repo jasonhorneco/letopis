@@ -228,3 +228,38 @@ export function findStart(t: Terrain, rng: Rng): { x: number; y: number } {
   }
   return best;
 }
+
+/** The red planet: dust plains, hills and old craters, ice at the poles; no water, no plants, no game.
+ *  People live there under domes and grow their food inside. */
+export function generateMars(seed: number): Terrain {
+  const rng = new Rng(seed);
+  const elev = new Simplex(rng);
+  const n = W * H;
+  const k = W / OLD_SIZE;
+  const t: Terrain = {
+    w: W, h: H,
+    height: new Float32Array(n), temp: new Float32Array(n), moist: new Float32Array(n), biome: new Uint8Array(n), river: new Uint8Array(n),
+    plants: new Float32Array(n), plantsCap: new Float32Array(n), game: new Float32Array(n), gameCap: new Float32Array(n), fish: new Float32Array(n),
+    flint: new Uint8Array(n), clay: new Uint8Array(n), grain: new Uint8Array(n), wildHerd: new Uint8Array(n), explored: new Uint8Array(n),
+  };
+  // craters: round bowls with a raised rim
+  const craters = Array.from({ length: Math.round(30 * k * k) }, () => ({ x: rng.range(0, W), y: rng.range(0, H), r: rng.range(3, 14) * k }));
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = idx(x, y);
+    let h = 0.25 + 0.3 * elev.fbm((x / W) * 4 * k, (y / H) * 4 * k, 4);
+    for (const c of craters) {
+      const d = Math.hypot(x - c.x, y - c.y) / c.r;
+      if (d < 1) h -= 0.18 * (1 - d * d);
+      else if (d < 1.25) h += 0.12 * (1 - Math.abs(d - 1.12) / 0.13);
+    }
+    h = Math.max(0.04, Math.min(0.95, h));
+    t.height[i] = h;
+    // the domes keep their people warm: the cold outside does not reach them
+    t.temp[i] = 0.5;
+    t.moist[i] = 0;
+    const pole = Math.min(y, H - 1 - y) / H;
+    t.biome[i] = pole < 0.05 ? Biome.Snow : h > 0.66 ? Biome.Mountain : h > 0.46 ? Biome.Hills : Biome.Desert;
+    if ((t.biome[i] === Biome.Hills || t.biome[i] === Biome.Mountain) && rng.chance(0.35)) t.flint[i] = 1;
+  }
+  return t;
+}

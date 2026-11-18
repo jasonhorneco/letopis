@@ -67,6 +67,8 @@ export interface WorldInfo {
   worldId: string;
   seed: number;
   w: number;
+  /** "mars": the second world (from v1.70) */
+  planet?: 'mars';
   h: number;
   /** base64 Uint8 arrays, row-major, w*h each */
   height: string;

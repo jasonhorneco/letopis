@@ -427,7 +427,7 @@ export const BEAST_EN: Record<string, string> = {
 };
 
 export const FEATURE_EN: Record<string, string> = {
-  реката: 'the river', гората: 'the forest', хълмовете: 'the hills', морето: 'the sea', 'голямата поляна': 'the great meadow',
+  реката: 'the river', гората: 'the forest', хълмовете: 'the hills', морето: 'the sea', 'голямата поляна': 'the great meadow', кратера: 'the crater',
 };
 
 export function formatYearEn(year: number): string {
@@ -451,6 +451,8 @@ export function deedEn(d: string): string {
   if ((m = /^Царска сватба с (принцесата|принца) на царство (.+) \((.+)\)$/.exec(d))) return `Royal wedding with the ${m[1] === 'принца' ? 'prince' : 'princess'} of the Kingdom of ${villageEn(m[2])} (${yearsInTextEn(m[3])})`;
   if ((m = /^Основа (.+) и стана негов (\S+) \((.+)\)$/.exec(d))) return `Founded the ${bandEn(m[1])} and became its ${chiefEn(m[2]).toLowerCase()} (${yearsInTextEn(m[3])})`;
   if ((m = /^Поведе лова на (.+)$/.exec(d))) return `Led the hunt for ${BEAST_EN[m[1]] ?? m[1]}`;
+  if ((m = /^Отлетя за Марс \((.+)\)$/.exec(d))) return `Flew to Mars (${yearsInTextEn(m[1])})`;
+  if ((m = /^Върна се от Марс \((.+)\)$/.exec(d))) return `Came back from Mars (${yearsInTextEn(m[1])})`;
   return yearsInTextEn(d);
 }
 

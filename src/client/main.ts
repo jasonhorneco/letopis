@@ -38,8 +38,10 @@ function save(key: string, v: unknown) {
   }
 }
 
+/** '/mars' when watching the second world: every question to the server goes there */
+const BASE = location.pathname.startsWith('/mars') ? '/mars' : '';
 async function api<T>(path: string): Promise<T> {
-  const r = await fetch(path);
+  const r = await fetch(BASE + path);
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json() as Promise<T>;
 }
@@ -255,7 +257,7 @@ setInterval(() => void checkVersion(), 60_000);
 }
 
 function connect() {
-  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${BASE}/ws`);
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
     if (m.t === 'snapshot') onSnapshot(m);
@@ -316,7 +318,7 @@ function linkedText(e: ChronicleEntry): string {
 function eventHtml(e: ChronicleEntry): string {
   const icon: Record<string, string> = {
     famous: '🌟', discovery: '💡', rediscovery: '🔁', settle: '🏘️', colony: '🏘️', split: '🚶', death: '🕯️', twins: '👶', hunt: '🦣',
-    winter: '❄️', secret: '✨', drought: '☀️', extinct: '🌑', lost: '📜', meet: '🤝', learn: '📚', era: '⭐', milestone: '👥', genesis: '🌅', merge: '🔗', marriage: '💞', end: '🌑', kingdom: '👑', spring: '🌸', flood: '🌊', epidemic: '🦠', murrain: '🐄', locusts: '🦗', harvest: '🌾', feast: '🎉', wedding: '💍',
+    winter: '❄️', secret: '✨', drought: '☀️', extinct: '🌑', lost: '📜', meet: '🤝', learn: '📚', era: '⭐', milestone: '👥', genesis: '🌅', merge: '🔗', marriage: '💞', end: '🌑', kingdom: '👑', spring: '🌸', flood: '🌊', epidemic: '🦠', murrain: '🐄', ship: '🚀', storm: '🌪️', locusts: '🦗', harvest: '🌾', feast: '🎉', wedding: '💍',
   };
   return `<li class="ev imp${e.importance}">
     <span class="ev-icon">${icon[e.kind] ?? '•'}</span>
@@ -681,7 +683,7 @@ function followStep() {
 
 async function showSecret(spot: SecretSpot) {
   const kind = SECRET_KIND(spot.kind);
-  const res = await fetch(`/api/secret/${spot.k}`, { method: 'POST' }).then((x) => x.json()).catch(() => null) as { first: boolean; found: number } | null;
+  const res = await fetch(`${BASE}/api/secret/${spot.k}`, { method: 'POST' }).then((x) => x.json()).catch(() => null) as { first: boolean; found: number } | null;
   r.markSecret(spot.k);
   if (activeTab === 'secrets') renderSide();
   openCard(`
@@ -870,6 +872,18 @@ $('#soundBtn').onclick = () => {
   sound.on = soundOn;
   if (soundOn) sound.start(); else sound.stop();
 };
+// the other world: a button to Mars once the first ship has landed there, and back to the Earth
+const planetBtn = $('#planetBtn') as HTMLButtonElement;
+document.body.classList.toggle('mars', !!BASE);
+if (BASE) $('.brand').insertAdjacentHTML('beforeend', ` <span class="planet">· ${T('Марс', 'Mars', 'Mars')}</span>`);
+const showPlanet = () => fetch('/api/planets').then((x) => x.json()).then((pl: { mars: boolean }) => {
+  planetBtn.hidden = !BASE && !pl.mars;
+  planetBtn.textContent = BASE ? T('Земя', 'Earth', 'Erde') : T('Марс', 'Mars', 'Mars');
+  planetBtn.title = BASE ? T('Обратно към Земята', 'Back to the Earth', 'Zurück zur Erde') : T('Колонията на Марс', 'The colony on Mars', 'Die Kolonie auf dem Mars');
+}).catch(() => undefined);
+void showPlanet();
+setInterval(showPlanet, 60_000);
+planetBtn.onclick = () => { location.href = BASE ? '/' : '/mars/'; };
 // the panel can hide; a small tab at the edge brings it back, and the choice is remembered
 const toggleSide = () => save('letopis.sideHidden', document.body.classList.toggle('side-hidden'));
 if (store('letopis.sideHidden', false)) document.body.classList.add('side-hidden');

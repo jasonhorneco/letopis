@@ -1,4 +1,5 @@
 import {
+  ColorMatrixFilter,
   AlphaFilter, Application, BlurFilter, Container, Filter, GlProgram, Graphics, ImageSource, Rectangle, Sprite, Text, Texture,
 } from 'pixi.js';
 import { Simplex } from '../shared/noise';
@@ -248,6 +249,8 @@ export class WorldRenderer {
   still = false;
   /** it is night right now (updated every frame) */
   nightNow = false;
+  /** the second world: red dust, no animals */
+  mars = false;
 
   constructor(app: Application, atlas: Atlas) {
     this.app = app;
@@ -326,6 +329,14 @@ export class WorldRenderer {
 
   setWorld(info: WorldInfo) {
     this.info = info;
+    this.mars = info.planet === 'mars';
+    // Mars: the same sand and rocks, but rusty red
+    const red = this.mars ? (() => {
+      const f = new ColorMatrixFilter();
+      f.matrix = [0.85, 0.35, 0.05, 0, 0.04, 0.3, 0.45, 0.05, 0, 0, 0.12, 0.15, 0.3, 0, 0, 0, 0, 0, 1, 0];
+      return [f];
+    })() : [];
+    for (const l of [this.terrainLayer, this.objLayer, this.farLayer, this.snowLayer]) l.filters = red;
     const h = b64decode(info.height);
     this.biome = b64decode(info.biome);
     this.river = b64decode(info.river);
@@ -960,7 +971,7 @@ export class WorldRenderer {
     }
     for (const [id, c] of this.camps) if (!seen.has(id)) { c.destroy(); this.camps.delete(id); }
     if (this.info) this.updateCleared();
-    this.fauna.updateBands(bands);
+    if (!this.mars) this.fauna.updateBands(bands);
     this.fleet.updateBands(bands);
     this.canoes.updateBands(bands);
     this.trains.updateBands(bands);
@@ -1295,7 +1306,7 @@ export class WorldRenderer {
       c.c.visible = on;
       if (on) c.frame(nowMs, zoom);
     }
-    this.fauna.frame(performance.now(), Math.min(0.1, dt / 60));
+    if (!this.mars) this.fauna.frame(performance.now(), Math.min(0.1, dt / 60));
     this.fleet.frame(performance.now(), Math.min(0.1, dt / 60));
     this.canoes.frame(performance.now(), Math.min(0.1, dt / 60));
     this.trains.frame(performance.now(), Math.min(0.1, dt / 60));

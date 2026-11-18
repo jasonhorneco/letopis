@@ -2,7 +2,7 @@ import { Rng } from '../../shared/rng';
 import {
   BandView, ChronicleEntry, ChronicleRef, GoneBand, PersonDetail, PersonRow, TASKS, TASK_NAMES, Task, CHIEF_TITLES, TimeInfo, TreeNode, FamilyTree, b64encode, formatYear, isWater, Biome, RIVER_WATER,
 } from '../../shared/types';
-import { Terrain, generateTerrain, findStart, idx, inBounds, W, H, setWorldSize, OLD_SIZE, NEW_SIZE } from './world';
+import { Terrain, generateTerrain, generateMars, findStart, idx, inBounds, W, H, setWorldSize, OLD_SIZE, NEW_SIZE } from './world';
 import { SECRET_COUNT, SECRET_HEROES, SECRET_KINDS, SecretFind } from '../../shared/secrets';
 import { FEMALE, MALE, bandColor, bandName, fixBandName, familyFrom, nickname, placeName } from './names';
 import { ERAS, TECHS, TECH_BY_ID, Tech, eraOf, techOpen } from './tech';
@@ -156,7 +156,14 @@ export interface SimState {
   /** everyone who ever wore a crown (from v1.41) */
   kingIds?: number[];
   nextKingdomId?: number;
+  /** 'mars': the second world, where the colonists live under domes (from v1.70) */
+  planet?: 'mars';
+  /** ships that flew between the worlds */
+  ships?: number;
 }
+
+/** people on their way to the other world */
+export interface Voyage { people: Person[]; techs: string[]; from: string; fromEn: string; fromDe: string; first: boolean }
 
 export interface DeadRecord {
   id: number;
@@ -208,7 +215,7 @@ export class Simulation {
       setWorldSize(state.size ?? OLD_SIZE);
       for (const b of state.bands) b.name = fixBandName(b.name);
       state.usedBands = state.usedBands.map(fixBandName);
-      this.t = generateTerrain(state.seed);
+      this.t = state.planet === 'mars' ? generateMars(state.seed) : generateTerrain(state.seed);
       this.regions = this.landRegions();
       this.rng = new Rng(state.rng);
       for (let i = 0; i < state.plants.length; i++) this.t.plants[i] = state.plants[i] / 100;
@@ -216,6 +223,8 @@ export class Simulation {
       const ex = Buffer.from(state.explored, 'base64');
       for (let i = 0; i < this.t.explored.length; i++) this.t.explored[i] = (ex[i >> 3] >> (i & 7)) & 1;
       this.initTrees(state.trees);
+      // no trees grow on Mars
+      if (state.planet === 'mars') { this.treeKind.fill(0); this.trees.fill(0); }
       this.roads = state.roads ? new Uint8Array(Buffer.from(state.roads, 'base64')) : new Uint8Array(W * H);
       if (this.roads.length !== W * H) this.roads = new Uint8Array(W * H);
       this.dryCamps();
@@ -1072,7 +1081,7 @@ export class Simulation {
       this.discover(b, m);
     }
     this.lifeAndDeath(members);
-    this.famousBirths(members);
+    if (!this.mars) this.famousBirths(members);
     if (this.month === 3) this.pairing(members);
     this.bandDynamics(members);
     this.contact();
@@ -1080,8 +1089,8 @@ export class Simulation {
     if (this.month === 7) this.kingdoms();
     if (this.month === 8) { this.growTowns(); this.gatherVillages(); }
     if (this.s.tick % 6 === 0) this.explore();
-    this.randomEvents(members);
-    this.disasters(members);
+    if (this.mars) this.marsEvents(); else { this.randomEvents(members); this.disasters(members); }
+    if (this.month === 4) this.voyages(members);
     this.checkEra();
     this.milestones();
     this.fixStrays();
@@ -1218,6 +1227,9 @@ export class Simulation {
     const land = (this.hasTech(b, 'plough') ? 1.4 : 1) * (this.hasTech(b, 'calendar') ? 1.1 : 1) * (this.hasTech(b, 'three_field') ? 1.15 : 1) * (this.hasTech(b, 'potato') ? 1.1 : 1);
     if (farmWant > 0) prod += Math.min(farmWant, this.arable(b) * land * this.farmSeason()) * craftBonus;
     const spoil = this.hasTech(b, 'pottery') ? 0.05 : this.hasTech(b, 'grinding') ? 0.08 : 0.12;
+    // on Mars the food grows under the domes, in the greenhouses and vertical farms
+    // each dome feeds a few hundred people; a fuller one goes short and some families move on to build a new dome
+    if (this.mars) prod = need * Math.max(0.75, Math.min(1.3, (1.3 * 450) / Math.max(1, m.length)));
     b.food = Math.max(0, b.food * (1 - spoil) + prod - need);
     // how well fed the band has been lately (smoothed over about a year)
     const cover = need > 0 ? Math.min(2, (prod + Math.min(b.food, need * 2)) / need) : 1;
@@ -1385,6 +1397,7 @@ export class Simulation {
 
   private settle(b: Band, m: Person[]) {
     if (b.settled) return;
+    if (this.mars) { this.settleNew(b); return; }
     b.settled = true;
     const used = new Set(this.s.usedPlaces);
     b.settlementName = placeName(this.rng, used);
@@ -1654,6 +1667,8 @@ export class Simulation {
           continue;
         }
       }
+      // on Mars nobody wanders: a group that leaves builds its own dome at once
+      if (this.mars && !b.settled) this.settleNew(b);
       // nomads move with the seasons and the game
       // nomads stay while there is wood around the camp; only a real famine drives them off earlier
       if (!b.settled && !b.scout) {
@@ -1663,7 +1678,7 @@ export class Simulation {
       }
       // split: rare, a band has to grow big first
       // a walled town holds more people before some leave to found a new village
-      const limit = b.settled ? this.townLimit(b) : 40 + Math.round(avg(m, (p) => p.genes.soc) * 20);
+      const limit = this.mars ? 450 : b.settled ? this.townLimit(b) : 40 + Math.round(avg(m, (p) => p.genes.soc) * 20);
       // too many mouths for this land: some leave to find their own
       const crowded = !b.settled && m.length >= 24 && (b.fed ?? 1) < 1.05 && this.rng.chance(0.012);
       if (m.length > limit || crowded) this.split(b, m, members);
@@ -1886,7 +1901,9 @@ export class Simulation {
       const r = this.rng.range(9, b.settled ? 22 : 16);
       const a = this.rng.range(0, Math.PI * 2);
       const x = Math.round(b.cx + Math.cos(a) * r), y = Math.round(b.cy + Math.sin(a) * r);
-      const s = this.campScore(x, y, 4, b);
+      // on Mars any flat ground away from the other domes will do
+      const s = this.mars ? (inBounds(x, y) && this.t.biome[idx(x, y)] !== Biome.Mountain && !this.s.bands.some((o) => Math.hypot(o.cx - x, o.cy - y) < 8) ? 1 + this.rng.next() : 0)
+        : this.campScore(x, y, 4, b);
       if (s > bestS) { bestS = s; best = { x, y }; }
     }
     if (!best) return;
@@ -1996,6 +2013,7 @@ export class Simulation {
   private featureNear(b: Band): string {
     const t = this.t;
     const i = idx(Math.round(b.cx), Math.round(b.cy));
+    if (this.mars) return t.biome[i] === Biome.Hills ? 'хълмовете' : 'кратера';
     if (t.river[i]) return 'реката';
     const bi = t.biome[i];
     if (bi === Biome.Forest || bi === Biome.Taiga) return 'гората';
@@ -2415,6 +2433,178 @@ export class Simulation {
     this.s.trees = Buffer.from(this.trees).toString('base64');
     this.s.roads = Buffer.from(this.roads).toString('base64');
     return this.s;
+  }
+
+  get mars(): boolean {
+    return this.s.planet === 'mars';
+  }
+
+  /** the second world: empty until the first ship lands; the same size and calendar as the Earth */
+  static newMars(earth: Simulation): Simulation {
+    const seed = (earth.s.seed ^ 0x6d617273) >>> 0;
+    const st: SimState = {
+      version: 1, worldId: `${earth.s.worldId}-mars`, seed, size: earth.s.size ?? OLD_SIZE, tick: earth.s.tick,
+      rng: new Rng(seed).s, nextPersonId: 1, nextBandId: 1, nextEventId: 1, people: [], bands: [], usedPlaces: [], usedBands: [],
+      discovered: [...earth.s.discovered], totalBorn: 0, totalDied: 0, era: earth.s.era, startedAt: Date.now(), milestone: 0,
+      plants: [], game: [], explored: '', planet: 'mars',
+    };
+    return new Simulation(st);
+  }
+
+  /** ships leaving for the other world this year, for the server to carry over */
+  outbox: Voyage[] = [];
+
+  /** a family-sized group leaves: whole couples with their small children */
+  private takeFamilies(from: Band[], members: Map<number, Person[]>, want: number): Person[] {
+    const out = new Set<Person>();
+    for (const b of this.rng.shuffle([...from])) {
+      for (const p of this.rng.shuffle([...(members.get(b.id) ?? [])])) {
+        if (out.size >= want) break;
+        const a = this.ageOf(p);
+        if (out.has(p) || p.fame || a < 18 || a > 45 || b.chiefId === p.id) continue;
+        out.add(p);
+        const partner = p.partnerId ? this.byId.get(p.partnerId) : undefined;
+        if (partner && !partner.fame && partner.bandId === p.bandId) out.add(partner);
+        for (const cid of p.children) {
+          const c = this.byId.get(cid);
+          if (c && !c.fame && c.bandId === p.bandId && this.ageOf(c) < 14) out.add(c);
+        }
+      }
+      if (out.size >= want) break;
+    }
+    return [...out];
+  }
+
+  /** they leave this world: not dead, just gone (families that stay behind lose a partner) */
+  private depart(list: Person[]) {
+    const going = new Set(list.map((p) => p.id));
+    for (const p of list) {
+      this.byId.delete(p.id);
+      const b = this.bandById.get(p.bandId);
+      if (b && b.chiefId === p.id) b.chiefId = null;
+    }
+    this.s.people = this.s.people.filter((p) => !going.has(p.id));
+    for (const p of this.s.people) if (p.partnerId && going.has(p.partnerId)) p.partnerId = null;
+  }
+
+  /** once a year: from the spaceports of the Earth a ship to Mars, and now and then one comes back */
+  private voyages(members: Map<number, Person[]>) {
+    if (this.mars) {
+      if (this.s.people.length < 300 || !this.rng.chance(0.06)) return;
+      const from = this.s.bands.filter((b) => (members.get(b.id)?.length ?? 0) > 40);
+      if (!from.length) return;
+      const list = this.takeFamilies(from, members, this.rng.int(6, 24));
+      if (!list.length) return;
+      const b = this.bandById.get(list[0].bandId)!;
+      this.depart(list);
+      this.s.ships = (this.s.ships ?? 0) + 1;
+      this.outbox.push({ people: list, techs: b.techs, from: this.bandLabel(b), fromEn: this.bandEnLabel(b), fromDe: this.bDe(b, 'dat'), first: false });
+      this.emit('ship', 2, `Кораб излетя от ${this.bandLabel(b)} към Земята с ${list.length} души. Някои се връщат при роднините си, а други искат да видят морето.`,
+        `${list.length} души от ${this.bandLabel(b)} полетяха към Земята. Ще видят истинско море!`, undefined, b.id, [],
+        [`A ship took off from ${this.bandEnLabel(b)} for the Earth with ${list.length} people. Some go back to their families, others want to see the sea.`,
+          `${list.length} people from ${this.bandEnLabel(b)} flew to the Earth. They will see a real sea!`],
+        [`Ein Schiff startete ${this.bWith('von', b)} zur Erde, mit ${list.length} Menschen an Bord. Manche kehren zu ihren Familien zurück, andere wollen das Meer sehen.`,
+          `${list.length} Menschen ${this.bWith('aus', b)} sind zur Erde geflogen. Sie werden ein echtes Meer sehen!`]);
+      return;
+    }
+    const ports = this.s.bands.filter((b) => b.settled && this.hasTech(b, 'mars_colony') && (members.get(b.id)?.length ?? 0) >= 40);
+    if (!ports.length) return;
+    const first = !this.s.ships;
+    const star = ports.some((b) => this.hasTech(b, 'starship'));
+    if (!first && !this.rng.chance(star ? 0.5 : 0.25)) return;
+    const want = first ? 100 : star ? this.rng.int(60, 150) : this.rng.int(20, 60);
+    const port = this.rng.pick(ports);
+    const list = this.takeFamilies([port, ...ports.filter((b) => b !== port)], members, want);
+    if (list.length < 10) return;
+    this.depart(list);
+    this.s.ships = (this.s.ships ?? 0) + 1;
+    this.outbox.push({ people: list, techs: port.techs, from: this.bandLabel(port), fromEn: this.bandEnLabel(port), fromDe: this.bDe(port, 'dat'), first });
+    if (first) {
+      this.emit('ship', 3, `Първият кораб към Марс излетя от ${this.bandLabel(port)}. На борда му има ${list.length} души, цели семейства с децата си. Те няма да се върнат скоро: отиват да построят нов свят под куполи.`,
+        `Ракета отнесе ${list.length} души от ${this.bandLabel(port)} до Марс! Там ще живеят под голям стъклен купол.`, undefined, port.id, [],
+        [`The first ship to Mars took off from ${this.bandEnLabel(port)}. On board are ${list.length} people, whole families with their children. They will not come back soon: they are going to build a new world under domes.`,
+          `A rocket took ${list.length} people from ${this.bandEnLabel(port)} to Mars! They will live there under a big glass dome.`],
+        [`Das erste Schiff zum Mars startete ${this.bWith('von', port)}. An Bord sind ${list.length} Menschen, ganze Familien mit ihren Kindern. Sie kommen so bald nicht zurück: Sie bauen eine neue Welt unter Kuppeln.`,
+          `Eine Rakete hat ${list.length} Menschen ${this.bWith('aus', port)} zum Mars gebracht! Dort leben sie unter einer großen Glaskuppel.`]);
+    } else {
+      this.emit('ship', 2, `Още един кораб излетя от ${this.bandLabel(port)} към Марс с ${list.length} души.`,
+        `${list.length} души от ${this.bandLabel(port)} полетяха към Марс!`, undefined, port.id, [],
+        [`Another ship took off from ${this.bandEnLabel(port)} for Mars with ${list.length} people.`, `${list.length} people from ${this.bandEnLabel(port)} flew to Mars!`],
+        [`Wieder startete ein Schiff ${this.bWith('von', port)} zum Mars, mit ${list.length} Menschen an Bord.`, `${list.length} Menschen ${this.bWith('aus', port)} sind zum Mars geflogen!`]);
+    }
+  }
+
+  /** a ship from the other world lands: new ids here, families stay families */
+  receive(v: Voyage) {
+    if (!v.people.length) return;
+    let b: Band;
+    const fresh = this.mars && (v.first || !this.s.bands.length || this.rng.chance(0.35));
+    if (fresh) {
+      // a new dome on flat ground, away from the others
+      let at = { x: Math.floor(W / 2), y: Math.floor(H / 2) };
+      for (let k = 0; k < 60; k++) {
+        const x = this.rng.int(20, W - 20), y = this.rng.int(20, H - 20);
+        if (this.t.biome[idx(x, y)] !== Biome.Desert) continue;
+        if (this.s.bands.some((o) => Math.hypot(o.cx - x, o.cy - y) < 14)) continue;
+        if (!this.s.bands.length && Math.hypot(x - W / 2, y - H / 2) > W / 4) continue;
+        at = { x, y };
+        break;
+      }
+      b = this.newBand(at.x, at.y, undefined, v.techs);
+      this.settleNew(b);
+    } else {
+      const homes = this.mars ? this.s.bands : this.s.bands.filter((o) => o.settled && this.hasTech(o, 'mars_colony'));
+      b = this.rng.pick(homes.length ? homes : this.s.bands.filter((o) => o.settled).length ? this.s.bands.filter((o) => o.settled) : this.s.bands);
+      for (const tech of v.techs) if (!this.hasTech(b, tech)) this.addTech(b, tech);
+    }
+    const ids = new Map<number, number>();
+    for (const p of v.people) ids.set(p.id, this.s.nextPersonId++);
+    const map = (id: number | null) => (id != null ? ids.get(id) ?? null : null);
+    for (const p of v.people) {
+      const np: Person = {
+        ...p, id: ids.get(p.id)!, bandId: b.id, motherId: map(p.motherId), fatherId: map(p.fatherId), partnerId: map(p.partnerId),
+        children: p.children.map((c) => ids.get(c)).filter((c): c is number => c != null), x: b.cx, y: b.cy, task: 'travel',
+        deeds: [...p.deeds, this.mars ? `Отлетя за Марс (${formatYear(this.year)})` : `Върна се от Марс (${formatYear(this.year)})`],
+      };
+      this.s.people.push(np);
+      this.byId.set(np.id, np);
+    }
+    for (const tech of v.techs) if (!this.s.discovered.includes(tech)) this.s.discovered.push(tech);
+    this.s.ships = (this.s.ships ?? 0) + 1;
+    const n = v.people.length;
+    if (this.mars && fresh) {
+      this.emit('ship', 3, `${v.first ? 'Първият кораб' : 'Кораб'} от Земята кацна на Марс. ${n} души от ${v.from} построиха купол и основаха ${this.bandLabel(b)}.${v.first ? ' Тук започва летописът на червената планета.' : ''}`,
+        `${n} души пристигнаха от Земята и построиха голям стъклен купол: ${this.bandLabel(b)}!`, undefined, b.id, [],
+        [`${v.first ? 'The first ship' : 'A ship'} from the Earth landed on Mars. ${n} people from ${v.fromEn} built a dome and founded ${this.bandEnLabel(b)}.${v.first ? ' Here the chronicle of the red planet begins.' : ''}`,
+          `${n} people came from the Earth and built a big glass dome: ${this.bandEnLabel(b, true)}!`],
+        [`${v.first ? 'Das erste Schiff' : 'Ein Schiff'} von der Erde landete auf dem Mars. ${n} Menschen aus ${v.fromDe} bauten eine Kuppel und gründeten ${this.bDe(b, 'akk')}.${v.first ? ' Hier beginnt die Chronik des roten Planeten.' : ''}`,
+          `${n} Menschen sind von der Erde gekommen und haben eine große Glaskuppel gebaut: ${this.bDe(b, 'nom')}!`]);
+    } else if (this.mars) {
+      this.emit('ship', 2, `Кораб от Земята кацна при ${this.bandLabel(b)}. ${n} души от ${v.from} заживяха под купола.`,
+        `${n} нови хора пристигнаха от Земята в ${this.bandLabel(b)}!`, undefined, b.id, [],
+        [`A ship from the Earth landed at ${this.bandEnLabel(b)}. ${n} people from ${v.fromEn} now live under the dome.`, `${n} new people came from the Earth to ${this.bandEnLabel(b)}!`],
+        [`Ein Schiff von der Erde landete ${this.bWith('bei', b)}. ${n} Menschen leben jetzt unter der Kuppel.`, `${n} neue Menschen sind von der Erde ${this.bWith('in', b)} angekommen!`]);
+    } else {
+      this.emit('ship', 2, `Кораб от Марс кацна в ${this.bandLabel(b)}. ${n} души от ${v.from} се върнаха на Земята.`,
+        `${n} души се върнаха от Марс в ${this.bandLabel(b)}. Разказват за червения пясък!`, undefined, b.id, [],
+        [`A ship from Mars landed at ${this.bandEnLabel(b)}. ${n} people from ${v.fromEn} came back to the Earth.`, `${n} people came back from Mars to ${this.bandEnLabel(b)}. They tell of the red sand!`],
+        [`Ein Schiff vom Mars landete ${this.bWith('in', b)}. ${n} Menschen sind zur Erde zurückgekehrt.`, `${n} Menschen sind vom Mars ${this.bWith('in', b)} zurückgekommen. Sie erzählen vom roten Sand!`]);
+    }
+  }
+
+  /** life under the domes: dust storms and a good year in the greenhouses */
+  private marsEvents() {
+    if (!this.s.bands.length) return;
+    if (this.rng.chance(0.006)) {
+      const b = this.rng.pick(this.s.bands);
+      b.food *= 0.7;
+      this.emit('storm', 1, `Прашна буря покри ${this.bandLabel(b)}. Седмици наред слънцето не се виждаше, а хората чистеха прозорците на оранжериите.`,
+        `Голяма прашна буря при ${this.bandLabel(b)}. Всички си стоят под купола и играят игри!`, undefined, b.id, [],
+        [`A dust storm covered ${this.bandEnLabel(b)}. For weeks the sun could not be seen, and people kept cleaning the greenhouse windows.`,
+          `A big dust storm at ${this.bandEnLabel(b)}. Everyone stays under the dome and plays games!`],
+        [`Ein Staubsturm bedeckte ${this.bDe(b, 'akk')}. Wochenlang war die Sonne nicht zu sehen, und die Menschen putzten die Fenster der Gewächshäuser.`,
+          `Ein großer Staubsturm ${this.bWith('bei', b)}. Alle bleiben unter der Kuppel und spielen Spiele!`]);
+    }
   }
 
   get extinct(): boolean {

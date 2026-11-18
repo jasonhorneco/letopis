@@ -474,7 +474,7 @@ export const BEAST_DE: Record<string, string> = {
 
 /** where two clans met */
 export const FEATURE_DE: Record<string, string> = {
-  реката: 'am Fluss', гората: 'am Waldrand', хълмовете: 'in den Hügeln', морето: 'am Meer', 'голямата поляна': 'auf der großen Wiese',
+  реката: 'am Fluss', гората: 'am Waldrand', хълмовете: 'in den Hügeln', морето: 'am Meer', 'голямата поляна': 'auf der großen Wiese', кратера: 'am Krater',
 };
 
 // ---------- years and numbers ----------
@@ -508,6 +508,8 @@ export function deedDe(d: string): string {
   if ((m = /^Царска сватба с (принцесата|принца) на царство (.+) \((.+)\)$/.exec(d))) return `Königliche Hochzeit mit ${m[1] === 'принца' ? 'dem Prinzen' : 'der Prinzessin'} des Königreichs ${villageDe(m[2])} (${yearsInTextDe(m[3])})`;
   if ((m = /^Основа (.+) и стана негов (\S+) \((.+)\)$/.exec(d))) return `Gründete ${bandTextCaseDe(m[1], 'akk')} und stand ihm vor (${yearsInTextDe(m[3])})`;
   if ((m = /^Поведе лова на (.+)$/.exec(d))) return `Führte die Jagd auf ${BEAST_DE[m[1]] ?? m[1]} an`;
+  if ((m = /^Отлетя за Марс \((.+)\)$/.exec(d))) return `Flog zum Mars (${yearsInTextDe(m[1])})`;
+  if ((m = /^Върна се от Марс \((.+)\)$/.exec(d))) return `Kam vom Mars zurück (${yearsInTextDe(m[1])})`;
   return yearsInTextDe(d);
 }
 

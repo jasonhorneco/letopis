@@ -173,7 +173,7 @@ export class Soundscape {
     set(this.wind, (0.04 + 0.06 * (1 - near)) * (0.6 + 0.4 * Math.sin(now * 0.23)));
     if (clear < 0.05) return;
     // birds by day over woods and fields, crickets at night
-    if (now > this.next.bird && m.land > 0.3) {
+    if (now > this.next.bird && m.land > 0.3 && !this.r.mars) {
       this.next.bird = now + 1.5 + Math.random() * 4 / (0.3 + m.forest);
       const g = a.createGain();
       g.gain.value = clear * (0.5 + m.forest);

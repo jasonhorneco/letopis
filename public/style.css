@@ -210,3 +210,4 @@ a.ref:hover { border-bottom-style: solid; }
 .famous li.found { cursor: pointer; margin-bottom: 4px; line-height: 1.35; }
 .famous li.found .muted { font-size: 12px; }
 .famous .alive { font-size: 11px; color: #7fd18b; margin-left: 4px; }
+.brand .planet { color: #e0785a; font-size: 0.8em; }
