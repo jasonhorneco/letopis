@@ -46,7 +46,7 @@ export class Atlas {
     const a = new Atlas();
     const v = version ? `?v=${version}` : '';
     const meta = await fetch(`${base}/atlas.json${v}`).then((r) => r.json());
-    const files: string[] = meta.pages ? meta.pages.map((p: { file: string }) => p.file) : ['atlas.png'];
+    const files: string[] = meta.pages ? meta.pages.map((p: { file: string }) => p.file) : ['atlas.webp'];
     const sources = await Promise.all(files.map(async (file) => {
       const blob = await fetch(`${base}/${file}${v}`).then((r) => r.blob());
       // WebGL ignores its premultiply flag for ImageBitmaps, so premultiply here and tell Pixi it is done;
@@ -1670,8 +1670,11 @@ export class PersonSprite {
       this.lens.push(this.lens[i - 1] + Math.hypot(this.path[i].x - this.path[i - 1].x, this.path[i].y - this.path[i - 1].y) * (wet ? 3 : 1));
     }
     this.tile = { x: tx, y: ty };
-    this.t0 = performance.now();
-    this.dur = Math.max(400, Math.min(tickMs * 0.85, 12000));
+    // not everybody sets off at the same moment: each waits a little of their own before going
+    const span = Math.max(400, Math.min(tickMs * 0.85, 12000));
+    const wait = hash(this.id, 211 + (row[3] & 7)) * span * 0.45;
+    this.t0 = performance.now() + wait;
+    this.dur = span - wait;
     this.cloth.tint = color;
     this.age = row[5];
     this.fame = !!row[8];
@@ -1686,7 +1689,7 @@ export class PersonSprite {
   }
 
   frame(now: number) {
-    const k = Math.min(1, (performance.now() - this.t0) / this.dur);
+    const k = Math.max(0, Math.min(1, (performance.now() - this.t0) / this.dur));
     const e = k * k * (3 - 2 * k);
     let x = this.to.x, y = this.to.y;
     let afloat: string | null = null;
@@ -1720,7 +1723,7 @@ export class PersonSprite {
       y = round.y;
       this.facing = round.face;
     }
-    const walking = !!round || (k < 0.95 && dist > 3);
+    const walking = !!round || (k > 0 && k < 0.95 && dist > 3);
     this.pos.x = x;
     this.pos.y = y;
     let bob = 0;

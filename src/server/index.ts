@@ -150,14 +150,16 @@ function restartWorld() {
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
-  '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.map': 'application/json', '.ico': 'image/x-icon',
+  '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.json': 'application/json', '.map': 'application/json', '.ico': 'image/x-icon',
   '.webmanifest': 'application/manifest+json',
 };
 
 function json(res: http.ServerResponse, data: unknown, status = 200) {
   const body = JSON.stringify(data);
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
-  res.end(body);
+  // the world and the people are big: packed they are about ten times smaller over a slow line
+  const zip = body.length > 16384 && /\bgzip\b/.test(String(res.req?.headers['accept-encoding'] ?? ''));
+  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...(zip ? { 'content-encoding': 'gzip', vary: 'accept-encoding' } : {}) });
+  res.end(zip ? gzipSync(body, { level: 4 }) : body);
 }
 
 /** every first discovery: what, who and when; old worlds are read back from the chronicle text */

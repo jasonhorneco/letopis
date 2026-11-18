@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pack the cut sprites from art/cut into public/sprites/atlas.png + atlas.json.
+"""Pack the cut sprites from art/cut into public/sprites/atlas*.webp + atlas.json.
 
 Usage: python3 -I tools/build_atlas.py   (after tools/slice_sprites.py)
 
@@ -725,7 +725,7 @@ def main() -> int:
 
     items += road_frames()
 
-    # shelf packing, tallest first; a new page (atlas1.png, ...) when one is full.
+    # shelf packing, tallest first; a new page (atlas1.webp, ...) when one is full.
     # The first page keeps the sheets it always had, so the order of GROUPS decides what goes where.
     frames = {}
     pages = []
@@ -757,8 +757,9 @@ def main() -> int:
         height = 1
         while height < used:
             height *= 2
-        fname = 'atlas.png' if not pages else f'atlas{len(pages)}.png'
-        atlas.crop((0, 0, ATLAS, height)).save(os.path.join(OUT, fname), optimize=True)
+        # WebP: about a third of the PNG, so the page opens much faster; the edges (alpha) stay lossless
+        fname = 'atlas.webp' if not pages else f'atlas{len(pages)}.webp'
+        atlas.crop((0, 0, ATLAS, height)).save(os.path.join(OUT, fname), 'WEBP', quality=90, method=5, alpha_quality=100)
         pages.append({'file': fname, 'size': [ATLAS, height]})
         print(f'page {fname}: {len(rest) - len(left)} frames, used {used} rows')
         if len(left) == len(rest):

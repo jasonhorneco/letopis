@@ -1,5 +1,6 @@
 import { Application } from 'pixi.js';
 import { Atlas, WorldRenderer, iso, TW, TH } from './render';
+import { Soundscape } from './sound';
 import {
   BandView, ChronicleEntry, Discovery, FamilyTree, GoneBand, TreeNode, PersonDetail, PersonRow, SnapshotMessage, TASKS, TASK_NAMES, TickMessage, WorldInfo, b64decode,
 } from '../shared/types';
@@ -42,6 +43,8 @@ async function api<T>(path: string): Promise<T> {
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json() as Promise<T>;
 }
+// the world, the people and the latest chronicle are asked for at once, while the sprites still load
+const early = { world: api<WorldInfo>('/api/world'), snap: api<SnapshotMessage>('/api/snapshot'), recent: api<ChronicleEntry[]>('/api/chronicle?limit=120') };
 
 // ---------- state ----------
 
@@ -853,6 +856,20 @@ $('#nightBtn').onclick = () => {
   save('letopis.night', night);
   $('#nightBtn').setAttribute('aria-pressed', String(night));
 };
+// sounds of the place under the camera; browsers let them start only after a click or a tap
+const sound = new Soundscape(r);
+let soundOn = store('letopis.sound', true);
+$('#soundBtn').setAttribute('aria-pressed', String(soundOn));
+const wake = () => { if (soundOn) { sound.on = true; sound.start(); } };
+window.addEventListener('pointerdown', wake, { once: true });
+window.addEventListener('keydown', wake, { once: true });
+$('#soundBtn').onclick = () => {
+  soundOn = !soundOn;
+  save('letopis.sound', soundOn);
+  $('#soundBtn').setAttribute('aria-pressed', String(soundOn));
+  sound.on = soundOn;
+  if (soundOn) sound.start(); else sound.stop();
+};
 // the panel can hide; a small tab at the edge brings it back, and the choice is remembered
 const toggleSide = () => save('letopis.sideHidden', document.body.classList.toggle('side-hidden'));
 if (store('letopis.sideHidden', false)) document.body.classList.add('side-hidden');
@@ -888,6 +905,7 @@ function frameStep(t: { deltaMS: number; deltaTime: number }) {
   cam.zoom += (cam.tz - cam.zoom) * k;
   applyCam();
   r.frame(t.deltaTime, Date.now());
+  sound.frame(cam.x, cam.y, cam.zoom, app.screen.width / 2);
   // nothing moves when zoomed far out: while the camera rests too, draw a few times a second only
   const resting = Math.abs(cam.tx - cam.x) + Math.abs(cam.ty - cam.y) < 0.5 && Math.abs(cam.tz - cam.zoom) < 0.002;
   const fps = r.still && resting && !tour && !dragging && pointers.size === 0 ? 12 : 0;
@@ -898,14 +916,14 @@ function frameStep(t: { deltaMS: number; deltaTime: number }) {
 
 // ---------- start ----------
 
-const info = await api<WorldInfo>('/api/world');
+const info = await early.world;
 worldId = info.worldId;
 const seenBefore = store<number>(`letopis.seen.${worldId}`, 0);
 r.setWorld(info);
 api<{ found: SecretFind[] }>('/api/secrets').then((s) => r.setSecrets(s.found.map((f) => f.k))).catch(() => r.setSecrets([]));
-const snap = await api<SnapshotMessage>('/api/snapshot');
+const snap = await early.snap;
 onSnapshot(snap);
-const recent = await api<ChronicleEntry[]>('/api/chronicle?limit=120');
+const recent = await early.recent;
 for (const e of recent.reverse()) addEvent(e, false);
 renderSide();
 if (bands.length) {

@@ -80,7 +80,7 @@ After changing or adding a sheet (needs Python, Pillow and NumPy):
 
 ```sh
 python3 -I tools/slice_sprites.py   # cuts the sheets into single sprites in art/cut/ and cleans the halos
-python3 -I tools/build_atlas.py     # builds public/sprites/atlas*.png and atlas.json
+python3 -I tools/build_atlas.py     # builds public/sprites/atlas*.webp and atlas.json
 ```
 
 The finished atlas is in git, so Python is not needed to build the game.
