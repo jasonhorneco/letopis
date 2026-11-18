@@ -167,10 +167,10 @@ export class Soundscape {
     const bed = near ** 0.7, clear = near ** 1.6;
     const set = (g: GainNode, v: number) => g.gain.setTargetAtTime(v, now, 0.5);
     set(this.master, 0.9);
-    set(this.water, m.water * 0.5 * bed);
-    set(this.waves, m.sea * (0.35 + 0.25 * Math.sin(now * 0.6)) * bed);
-    set(this.crowd, m.crowd * (night ? 0.08 : 0.32) * (0.75 + 0.25 * Math.sin(now * 0.9 + Math.sin(now * 2.3))) * bed);
-    set(this.wind, (0.04 + 0.06 * (1 - near)) * (0.6 + 0.4 * Math.sin(now * 0.23)));
+    set(this.water, m.water * 0.12 * bed);
+    set(this.waves, m.sea * (0.08 + 0.05 * Math.sin(now * 0.6)) * bed);
+    set(this.crowd, m.crowd * (night ? 0.03 : 0.1) * (0.75 + 0.25 * Math.sin(now * 0.9 + Math.sin(now * 2.3))) * bed);
+    set(this.wind, 0); // the steady wind was heard everywhere and grated
     if (clear < 0.05) return;
     // birds by day over woods and fields, crickets at night
     if (now > this.next.bird && m.land > 0.3 && !this.r.mars) {
