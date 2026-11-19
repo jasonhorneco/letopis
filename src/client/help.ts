@@ -20,6 +20,29 @@ const TAG_ORDER: Tag[] = ['breaking', 'new', 'old'];
 
 /** newest first; a new version gets its own entry here */
 export const CHANGELOG: Release[] = [
+  { v: '1.80', items: [
+    ['Марс: щом някой открие „Колония на Марс“, от най-големите космодруми излита кораб със 100 души, цели семейства. На червената планета започва втори свят със собствен летопис, хора, родове и куполи. Всяка година летят нови кораби, а със Звездния кораб стават по-големи. Понякога хора от Марс се връщат на Земята. На Марс колонистите ходят в скафандри и живеят в стъклени куполи сред червени скали и кратери, а на площадките кацат и излитат ракети. Бутонът „Марс“ долу показва новия свят, а „Земя“ връща обратно.',
+      'Mars: as soon as someone discovers “Mars Colony”, a ship with 100 people, whole families, takes off from one of the big spaceports. On the red planet a second world begins, with its own chronicle, people, clans and domes. New ships fly every year, and with the starship they grow bigger. Now and then people from Mars come back to the Earth. On Mars the colonists walk in space suits and live in glass domes among red rocks and craters, and rockets land and lift off at the pads. The “Mars” button below shows the new world, and “Earth” takes you back.',
+      'Mars: Sobald jemand die „Marskolonie“ entdeckt, startet von einem der großen Raumhäfen ein Schiff mit 100 Menschen, ganzen Familien. Auf dem roten Planeten beginnt eine zweite Welt mit eigener Chronik, eigenen Menschen, Clans und Kuppeln. Jedes Jahr fliegen neue Schiffe, und mit dem Sternenschiff werden sie größer. Ab und zu kehren Menschen vom Mars zur Erde zurück. Auf dem Mars gehen die Siedler in Raumanzügen und wohnen in Glaskuppeln zwischen roten Felsen und Kratern, und auf den Landeplätzen landen und starten Raketen. Der Knopf „Mars“ unten zeigt die neue Welt, „Erde“ bringt dich zurück.', 'add'],
+    ['Бедствия: наводнения, суши, мор и мор по добитъка засягат цели области, а не само едно село. Летописът казва колко души са загинали и в кои села. Медицината, ваксините и антибиотиците правят мора по-лек, а акведуктът пази от сушата.',
+      'Disasters: floods, droughts, plagues and cattle plagues strike whole regions, not just one village. The chronicle tells how many people died and in which villages. Medicine, vaccines and antibiotics make plagues milder, and an aqueduct helps against drought.',
+      'Katastrophen: Hochwasser, Dürren, Seuchen und Viehseuchen treffen ganze Gegenden, nicht nur ein Dorf. Die Chronik sagt, wie viele Menschen in welchen Dörfern gestorben sind. Medizin, Impfungen und Antibiotika machen Seuchen milder, und ein Aquädukt hilft gegen die Dürre.', 'add'],
+    ['Статистика с графики: население, родени и починали на година, родове, села и царства, открития и жертви на бедствия във времето.',
+      'Statistics with charts: population, births and deaths per year, clans, villages and kingdoms, discoveries and disaster deaths over time.',
+      'Statistik mit Diagrammen: Bevölkerung, Geburten und Todesfälle pro Jahr, Clans, Dörfer und Königreiche, Entdeckungen und Todesopfer von Katastrophen im Lauf der Zeit.', 'add'],
+    ['Звуци от истински записи: чуваш мястото под камерата. Над водата тече река или шумят вълни, в селото се чува чук, а нощем пращи огънят. Над полето пеят птици, а нощем щурци и бухал. Колкото по-високо е камерата, толкова повече звуците се сливат и заглъхват. Бутон „Звук“ ги спира.',
+      'Sounds from real recordings: you hear the place under the camera. Over the water a river babbles or waves roll, in a village a hammer rings and at night the fire crackles. Birds sing over the fields, at night crickets chirp and an owl hoots. The higher the camera, the more the sounds blend and fade. The “Sound” button turns them off.',
+      'Geräusche aus echten Aufnahmen: Du hörst den Ort unter der Kamera. Über dem Wasser plätschert ein Fluss oder rauschen Wellen, im Dorf klingt ein Hammer und nachts knistert das Feuer. Über den Feldern singen Vögel, nachts zirpen Grillen und ein Uhu ruft. Je höher die Kamera, desto mehr verschwimmen und verklingen die Geräusche. Der Knopf „Ton“ schaltet sie aus.', 'add'],
+    ['Музика на епохата: тиха фонова музика, по две песни за всяка епоха и за Марс, които се редуват и плавно се сменят с нова епоха. Бутонът „Звук“ отваря панел, в който музиката и звуците се пускат и спират поотделно и всяко си има плъзгач за силата.',
+      'Music of the age: quiet background music, two songs for every age and for Mars that take turns and blend into the next age when it begins. The “Sound” button opens a panel where music and sounds are switched on and off separately, each with its own volume slider.',
+      'Musik des Zeitalters: leise Hintergrundmusik, zwei Lieder für jedes Zeitalter und für den Mars, die sich abwechseln und beim Beginn eines neuen Zeitalters sanft überblenden. Der Knopf „Ton“ öffnet ein Feld, in dem Musik und Geräusche getrennt ein- und ausgeschaltet werden, jedes mit eigenem Lautstärkeregler.', 'add'],
+    ['Хората вече не тръгват и не спират всички в един и същи миг: всеки върви със своя крачка и потегля в свой момент през месеца, а който няма работа, се разхожда наоколо.',
+      'People no longer all set off and stop at the same moment: each walks at their own pace and sets off at their own time in the month, and those with nothing to do stroll around.',
+      'Die Menschen gehen nicht mehr alle im selben Augenblick los und bleiben nicht alle zugleich stehen: Jeder geht in seinem eigenen Schritt und bricht irgendwann im Monat auf, und wer nichts zu tun hat, spaziert umher.', 'fix'],
+    ['Светът се отваря по-бързо: картинките са три пъти по-малки, а данните идват компресирани и наведнъж.',
+      'The world opens faster: the pictures are three times smaller, and the data comes packed and all at once.',
+      'Die Welt öffnet sich schneller: Die Bilder sind dreimal kleiner, und die Daten kommen gepackt und alle auf einmal.', 'fix'],
+  ] },
   { v: '1.62', items: [
     ['Лодки по реките: който знае лодката, вече не заобикаля реката, а я прекосява бавно с кану, акостира и продължава по пътя си. През Средновековието кануто става дървена лодка с гребла, а в наши дни моторница.',
       'Boats on the rivers: once people know the boat, they no longer walk round a river but paddle slowly across in a canoe, land and go on their way. In the Middle Ages the canoe becomes a wooden rowing boat, and in our days a motorboat.',
@@ -190,5 +213,5 @@ export function helpWindowHtml(): string {
       <summary>${title(r.v)}</summary>
       <ul>${[...r.items].sort((a, b) => rank(a) - rank(b)).map(itemHtml).join('')}</ul>
     </details>`).join('');
-  return `<h2>${T('Летопис', 'Letopis', 'Letopis')}</h2><div class="releases">${releases}</div>${helpHtml()}`;
+  return `<h2>${T('Летопис', 'Letopis', 'Letopis')}</h2>${helpHtml()}<div class="releases">${releases}</div>`;
 }

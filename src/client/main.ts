@@ -1,5 +1,10 @@
 import { Application } from 'pixi.js';
 import { Atlas, WorldRenderer, iso, TW, TH } from './render';
+import { Soundscape } from './sound';
+import { Music } from './music';
+
+/** quiet music of the age (set up with the sound panel further down) */
+const music = new Music();
 import {
   BandView, ChronicleEntry, Discovery, FamilyTree, GoneBand, TreeNode, PersonDetail, PersonRow, SnapshotMessage, TASKS, TASK_NAMES, TickMessage, WorldInfo, b64decode,
 } from '../shared/types';
@@ -37,11 +42,15 @@ function save(key: string, v: unknown) {
   }
 }
 
+/** '/mars' when watching the second world: every question to the server goes there */
+const BASE = location.pathname.startsWith('/mars') ? '/mars' : '';
 async function api<T>(path: string): Promise<T> {
-  const r = await fetch(path);
+  const r = await fetch(BASE + path);
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json() as Promise<T>;
 }
+// the world, the people and the latest chronicle are asked for at once, while the sprites still load
+const early = { world: api<WorldInfo>('/api/world'), snap: api<SnapshotMessage>('/api/snapshot'), recent: api<ChronicleEntry[]>('/api/chronicle?limit=120') };
 
 // ---------- state ----------
 
@@ -195,6 +204,7 @@ function applyTime(t: TickMessage['time'], population: number) {
   $('#year').textContent = fmtYear(t.year);
   $('#month').textContent = monthName(t.month);
   $('#era').textContent = ERA(t.eraName);
+  music.setEra(t.era, !!BASE);
   const gate = TECH_LIST.find(([id]) => id === ERA_GATE[t.era + 1]);
   $('#nextEra').textContent = gate ? `${T('следва', 'next', 'als Nächstes')}: ${TECH_ID(gate[0], gate[1])}` : '';
   $('#pop').textContent = num(population);
@@ -252,7 +262,7 @@ setInterval(() => void checkVersion(), 60_000);
 }
 
 function connect() {
-  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${BASE}/ws`);
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
     if (m.t === 'snapshot') onSnapshot(m);
@@ -313,7 +323,7 @@ function linkedText(e: ChronicleEntry): string {
 function eventHtml(e: ChronicleEntry): string {
   const icon: Record<string, string> = {
     famous: '🌟', discovery: '💡', rediscovery: '🔁', settle: '🏘️', colony: '🏘️', split: '🚶', death: '🕯️', twins: '👶', hunt: '🦣',
-    winter: '❄️', secret: '✨', drought: '☀️', extinct: '🌑', lost: '📜', meet: '🤝', learn: '📚', era: '⭐', milestone: '👥', genesis: '🌅', merge: '🔗', marriage: '💞', end: '🌑', kingdom: '👑', spring: '🌸', flood: '🌊', locusts: '🦗', harvest: '🌾', feast: '🎉', wedding: '💍',
+    winter: '❄️', secret: '✨', drought: '☀️', extinct: '🌑', lost: '📜', meet: '🤝', learn: '📚', era: '⭐', milestone: '👥', genesis: '🌅', merge: '🔗', marriage: '💞', end: '🌑', kingdom: '👑', spring: '🌸', flood: '🌊', epidemic: '🦠', murrain: '🐄', ship: '🚀', storm: '🌪️', locusts: '🦗', harvest: '🌾', feast: '🎉', wedding: '💍',
   };
   return `<li class="ev imp${e.importance}">
     <span class="ev-icon">${icon[e.kind] ?? '•'}</span>
@@ -452,42 +462,85 @@ function renderSide() {
 }
 
 let statsAt = 0;
+interface StatRow { year: number; population: number; bands: number; era: number; techs: number; villages?: number; born?: number; died?: number; kingdoms?: number; disaster?: number }
+interface Series { label: string; color: string; values: (number | null)[]; bars?: boolean }
+const CHART_COLORS = ['#e0a84f', '#6fb1e0', '#d9675b', '#7fc77a', '#b58be0'];
+
 async function renderStats(body: HTMLElement) {
   if (performance.now() - statsAt < 15000 && body.querySelector('canvas')) return;
   statsAt = performance.now();
-  const rows = await api<{ year: number; population: number; bands: number; era: number; techs: number }[]>('/api/stats');
+  const rows = await api<StatRow[]>('/api/stats');
   if (activeTab !== 'stats') return;
   const techsKnown = new Set(bands.flatMap((b) => b.techs));
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || CHART_COLORS[0];
+  // per year from two running totals (older rows have none)
+  const perYear = (k: 'born' | 'died' | 'disaster') => rows.map((r2, i) => {
+    const a = rows[i - 1];
+    if (!a || a[k] == null || r2[k] == null) return null;
+    return Math.max(0, (r2[k]! - a[k]!) / Math.max(1, r2.year - a.year));
+  });
+  const charts: [string, Series[]][] = [
+    [T('Население', 'Population', 'Bevölkerung'), [{ label: '', color: accent, values: rows.map((r2) => r2.population) }]],
+    [T('Родени и починали на година', 'Born and died per year', 'Geburten und Todesfälle pro Jahr'), [
+      { label: T('родени', 'born', 'geboren'), color: CHART_COLORS[3], values: perYear('born') },
+      { label: T('починали', 'died', 'gestorben'), color: CHART_COLORS[2], values: perYear('died') }]],
+    [T('Родове, села и царства', 'Clans, villages and kingdoms', 'Clans, Dörfer und Königreiche'), [
+      { label: T('родове', 'clans', 'Clans'), color: CHART_COLORS[1], values: rows.map((r2) => r2.bands) },
+      { label: T('села', 'villages', 'Dörfer'), color: accent, values: rows.map((r2) => r2.villages ?? null) },
+      { label: T('царства', 'kingdoms', 'Königreiche'), color: CHART_COLORS[4], values: rows.map((r2) => r2.kingdoms ?? null) }]],
+    [T('Открития', 'Discoveries', 'Entdeckungen'), [{ label: '', color: CHART_COLORS[3], values: rows.map((r2) => r2.techs) }]],
+    [T('Жертви на бедствия на година', 'Disaster deaths per year', 'Todesopfer von Katastrophen pro Jahr'), [
+      { label: '', color: CHART_COLORS[2], values: perYear('disaster'), bars: true }]],
+  ];
   body.innerHTML = `
     <div class="kpis">
       <div><span>${T('Родени', 'Born', 'Geboren')}</span><b id="born2">${$('#born').textContent}</b></div>
       <div><span>${T('Починали', 'Died', 'Gestorben')}</span><b>${$('#died').textContent}</b></div>
       <div><span>${T('Знания', 'Knowledge', 'Wissen')}</span><b>${techsKnown.size}</b></div>
     </div>
-    <h3>${T('Население', 'Population', 'Bevölkerung')}</h3><canvas id="popChart" height="160"></canvas>
+    ${charts.map(([title, series], k) => `<h3>${esc(title)}</h3>${series.length > 1 ? `<div class="legend">${series.map((x) => `<span><i style="background:${x.color}"></i>${esc(x.label)}</span>`).join('')}</div>` : ''}<canvas class="chart" id="chart${k}" height="140"></canvas>`).join('')}
     <h3>${T('Какво знаят хората', 'What people know', 'Was die Menschen wissen')}</h3><div class="techs">${[...techsKnown].map((t) => `<span class="pill">${esc(TECH(t))}</span>`).join('') || `<span class="muted">${T('Нищо още', 'Nothing yet', 'Noch nichts')}</span>`}</div>`;
-  const c = $('#popChart') as HTMLCanvasElement;
-  const w = (c.width = c.clientWidth * 2), h = (c.height = 320);
-  const g = c.getContext('2d')!;
   if (rows.length < 2) return;
-  const max = Math.max(...rows.map((r2) => r2.population)) * 1.1;
-  const styles = getComputedStyle(document.documentElement);
-  g.strokeStyle = styles.getPropertyValue('--accent').trim() || '#e0a84f';
-  g.fillStyle = (styles.getPropertyValue('--accent').trim() || '#e0a84f') + '33';
-  g.lineWidth = 4;
-  g.beginPath();
-  rows.forEach((r2, i) => {
-    const x = (i / (rows.length - 1)) * w, y = h - (r2.population / max) * (h - 20);
-    i ? g.lineTo(x, y) : g.moveTo(x, y);
-  });
-  g.stroke();
-  g.lineTo(w, h); g.lineTo(0, h); g.closePath(); g.fill();
-  g.fillStyle = styles.getPropertyValue('--muted').trim();
+  charts.forEach(([, series], k) => drawChart($(`#chart${k}`) as HTMLCanvasElement, rows.map((r2) => r2.year), series));
+}
+
+/** a small line (or bar) chart: first and last year below, the highest value in the corner */
+function drawChart(c: HTMLCanvasElement, years: number[], series: Series[]) {
+  const w = (c.width = c.clientWidth * 2), h = (c.height = 280), top = 34, foot = 34;
+  const g = c.getContext('2d')!;
+  const all = series.flatMap((x) => x.values.filter((v): v is number => v != null));
+  const max = Math.max(1, ...all) * 1.08;
+  const n = years.length;
+  const X = (i: number) => (i / (n - 1)) * w, Y = (v: number) => h - foot - (v / max) * (h - top - foot);
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#888';
+  for (const sr of series) {
+    g.strokeStyle = sr.color;
+    g.fillStyle = sr.color + (series.length > 1 ? '22' : '33');
+    g.lineWidth = 4;
+    if (sr.bars) {
+      g.fillStyle = sr.color;
+      const bw = Math.max(2, w / n - 1);
+      sr.values.forEach((v, i) => { if (v) g.fillRect(X(i) - bw / 2, Y(v), bw, h - foot - Y(v)); });
+      continue;
+    }
+    g.beginPath();
+    let first = -1, last = -1;
+    sr.values.forEach((v, i) => {
+      if (v == null) return;
+      if (first < 0) { first = i; g.moveTo(X(i), Y(v)); } else g.lineTo(X(i), Y(v));
+      last = i;
+    });
+    if (first < 0) continue;
+    g.stroke();
+    if (series.length === 1) { g.lineTo(X(last), h - foot); g.lineTo(X(first), h - foot); g.closePath(); g.fill(); }
+  }
+  g.fillStyle = muted;
   g.font = '22px system-ui';
-  g.fillText(fmtYear(rows[0].year), 8, h - 8);
-  const endLabel = fmtYear(rows[rows.length - 1].year);
+  g.fillText(fmtYear(years[0]), 8, h - 8);
+  const endLabel = fmtYear(years[n - 1]);
   g.fillText(endLabel, w - g.measureText(endLabel).width - 8, h - 8);
-  g.fillText(`${T('макс.', 'max', 'max.')} ${num(Math.round(max / 1.1))}`, 8, 26);
+  const top1 = Math.round(max / 1.08);
+  g.fillText(`${T('макс.', 'max', 'max.')} ${num(top1)}`, 8, 24);
 }
 
 async function loadOlder() {
@@ -635,7 +688,7 @@ function followStep() {
 
 async function showSecret(spot: SecretSpot) {
   const kind = SECRET_KIND(spot.kind);
-  const res = await fetch(`/api/secret/${spot.k}`, { method: 'POST' }).then((x) => x.json()).catch(() => null) as { first: boolean; found: number } | null;
+  const res = await fetch(`${BASE}/api/secret/${spot.k}`, { method: 'POST' }).then((x) => x.json()).catch(() => null) as { first: boolean; found: number } | null;
   r.markSecret(spot.k);
   if (activeTab === 'secrets') renderSide();
   openCard(`
@@ -810,6 +863,72 @@ $('#nightBtn').onclick = () => {
   save('letopis.night', night);
   $('#nightBtn').setAttribute('aria-pressed', String(night));
 };
+// sounds of the place under the camera; browsers let them start only after a click or a tap
+const sound = new Soundscape(r);
+// and quiet music of the age; the "Sound" button opens a small panel: each on or off, each with its own volume
+let soundOn = store('letopis.sound', true);
+let musicOn = store('letopis.music', true);
+sound.volume = store('letopis.soundVol', 70) / 100;
+music.volume = store('letopis.musicVol', 60) / 100;
+($('#sfxVol') as HTMLInputElement).value = String(Math.round(sound.volume * 100));
+($('#musicVol') as HTMLInputElement).value = String(Math.round(music.volume * 100));
+const showSound = () => {
+  $('#sfxToggle').setAttribute('aria-pressed', String(soundOn));
+  $('#musicToggle').setAttribute('aria-pressed', String(musicOn));
+  $('#soundBtn').setAttribute('aria-pressed', String(soundOn || musicOn));
+};
+showSound();
+const wake = () => {
+  if (soundOn) { sound.on = true; sound.start(); }
+  if (musicOn) music.start();
+};
+window.addEventListener('pointerdown', wake, { once: true });
+window.addEventListener('keydown', wake, { once: true });
+const soundPanel = $('#soundPanel');
+$('#soundBtn').onclick = (ev) => {
+  ev.stopPropagation();
+  soundPanel.hidden = !soundPanel.hidden;
+  $('#soundBtn').setAttribute('aria-expanded', String(!soundPanel.hidden));
+};
+soundPanel.onclick = (ev) => ev.stopPropagation();
+document.addEventListener('pointerdown', (ev) => {
+  if (!soundPanel.hidden && !(ev.target as HTMLElement).closest('.sound-wrap')) { soundPanel.hidden = true; $('#soundBtn').setAttribute('aria-expanded', 'false'); }
+});
+$('#sfxToggle').onclick = () => {
+  soundOn = !soundOn;
+  save('letopis.sound', soundOn);
+  sound.on = soundOn;
+  if (soundOn) sound.start(); else sound.stop();
+  showSound();
+};
+$('#musicToggle').onclick = () => {
+  musicOn = !musicOn;
+  save('letopis.music', musicOn);
+  if (musicOn) music.start(); else music.stop();
+  showSound();
+};
+($('#sfxVol') as HTMLInputElement).oninput = (ev) => {
+  const v = Number((ev.target as HTMLInputElement).value);
+  sound.volume = v / 100;
+  save('letopis.soundVol', v);
+};
+($('#musicVol') as HTMLInputElement).oninput = (ev) => {
+  const v = Number((ev.target as HTMLInputElement).value);
+  music.setVolume(v / 100);
+  save('letopis.musicVol', v);
+};
+// the other world: a button to Mars once the first ship has landed there, and back to the Earth
+const planetBtn = $('#planetBtn') as HTMLButtonElement;
+document.body.classList.toggle('mars', !!BASE);
+if (BASE) $('.brand').insertAdjacentHTML('beforeend', ` <span class="planet">· ${T('Марс', 'Mars', 'Mars')}</span>`);
+const showPlanet = () => fetch('/api/planets').then((x) => x.json()).then((pl: { mars: boolean }) => {
+  planetBtn.hidden = !BASE && !pl.mars;
+  planetBtn.textContent = BASE ? T('Земя', 'Earth', 'Erde') : T('Марс', 'Mars', 'Mars');
+  planetBtn.title = BASE ? T('Обратно към Земята', 'Back to the Earth', 'Zurück zur Erde') : T('Колонията на Марс', 'The colony on Mars', 'Die Kolonie auf dem Mars');
+}).catch(() => undefined);
+void showPlanet();
+setInterval(showPlanet, 60_000);
+planetBtn.onclick = () => { location.href = BASE ? '/' : '/mars/'; };
 // the panel can hide; a small tab at the edge brings it back, and the choice is remembered
 const toggleSide = () => save('letopis.sideHidden', document.body.classList.toggle('side-hidden'));
 if (store('letopis.sideHidden', false)) document.body.classList.add('side-hidden');
@@ -845,6 +964,7 @@ function frameStep(t: { deltaMS: number; deltaTime: number }) {
   cam.zoom += (cam.tz - cam.zoom) * k;
   applyCam();
   r.frame(t.deltaTime, Date.now());
+  sound.frame(cam.x, cam.y, cam.zoom, app.screen.width / 2);
   // nothing moves when zoomed far out: while the camera rests too, draw a few times a second only
   const resting = Math.abs(cam.tx - cam.x) + Math.abs(cam.ty - cam.y) < 0.5 && Math.abs(cam.tz - cam.zoom) < 0.002;
   const fps = r.still && resting && !tour && !dragging && pointers.size === 0 ? 12 : 0;
@@ -855,14 +975,14 @@ function frameStep(t: { deltaMS: number; deltaTime: number }) {
 
 // ---------- start ----------
 
-const info = await api<WorldInfo>('/api/world');
+const info = await early.world;
 worldId = info.worldId;
 const seenBefore = store<number>(`letopis.seen.${worldId}`, 0);
 r.setWorld(info);
 api<{ found: SecretFind[] }>('/api/secrets').then((s) => r.setSecrets(s.found.map((f) => f.k))).catch(() => r.setSecrets([]));
-const snap = await api<SnapshotMessage>('/api/snapshot');
+const snap = await early.snap;
 onSnapshot(snap);
-const recent = await api<ChronicleEntry[]>('/api/chronicle?limit=120');
+const recent = await early.recent;
 for (const e of recent.reverse()) addEvent(e, false);
 renderSide();
 if (bands.length) {

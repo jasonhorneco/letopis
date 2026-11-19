@@ -48,3 +48,28 @@ jobs:
             LETOPIS_CHANNEL=${{ github.ref == 'refs/heads/dev' && 'dev' || '' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # a GitHub release only for the round versions (1.70, 1.80, ...), once, when they reach main
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Release a round version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V=$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")
+          case "$V" in *0) ;; *) echo "v$V is not a round version"; exit 0 ;; esac
+          if gh release view "v$V" > /dev/null 2>&1; then echo "v$V already released"; exit 0; fi
+          npm ci
+          npx esbuild scripts/release-notes.ts --bundle --platform=node --format=esm --outfile=dist/release-notes.mjs --log-level=warning
+          node dist/release-notes.mjs "$V" > notes.md
+          gh release create "v$V" --title "Letopis $V" --notes-file notes.md --target "$GITHUB_SHA"

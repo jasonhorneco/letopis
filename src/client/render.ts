@@ -1,4 +1,5 @@
 import {
+  ColorMatrixFilter,
   AlphaFilter, Application, BlurFilter, Container, Filter, GlProgram, Graphics, ImageSource, Rectangle, Sprite, Text, Texture,
 } from 'pixi.js';
 import { Simplex } from '../shared/noise';
@@ -46,15 +47,17 @@ export class Atlas {
     const a = new Atlas();
     const v = version ? `?v=${version}` : '';
     const meta = await fetch(`${base}/atlas.json${v}`).then((r) => r.json());
-    const files: string[] = meta.pages ? meta.pages.map((p: { file: string }) => p.file) : ['atlas.png'];
+    const files: string[] = meta.pages ? meta.pages.map((p: { file: string }) => p.file) : ['atlas.webp'];
     const sources = await Promise.all(files.map(async (file) => {
-      const blob = await fetch(`${base}/${file}${v}`).then((r) => r.blob());
-      // WebGL ignores its premultiply flag for ImageBitmaps, so premultiply here and tell Pixi it is done;
-      // otherwise half-transparent edges are drawn too bright (light halos around every sprite)
-      const bitmap = await createImageBitmap(blob, { premultiplyAlpha: 'premultiply' });
+      // a plain <img> with premultiply-on-upload: the one path every browser handles fast. Firefox treats
+      // premultiplied ImageBitmap uploads as a deprecated slow path (up to a minute, even a lost WebGL context)
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = `${base}/${file}${v}`;
+      await img.decode();
       return new ImageSource({
-        resource: bitmap,
-        alphaMode: 'premultiplied-alpha',
+        resource: img,
+        alphaMode: 'premultiply-alpha-on-upload',
         autoGenerateMipmaps: true,
         scaleMode: 'linear',
         mipmapFilter: 'linear',
@@ -248,6 +251,8 @@ export class WorldRenderer {
   still = false;
   /** it is night right now (updated every frame) */
   nightNow = false;
+  /** the second world: red dust, no animals */
+  mars = false;
 
   constructor(app: Application, atlas: Atlas) {
     this.app = app;
@@ -326,6 +331,16 @@ export class WorldRenderer {
 
   setWorld(info: WorldInfo) {
     this.info = info;
+    this.mars = info.planet === 'mars';
+    // Mars: the same sand and rocks, but rusty red
+    const red = this.mars ? (() => {
+      const f = new ColorMatrixFilter();
+      f.matrix = [0.85, 0.35, 0.05, 0, 0.04, 0.3, 0.45, 0.05, 0, 0, 0.12, 0.15, 0.3, 0, 0, 0, 0, 0, 1, 0];
+      return [f];
+    })() : [];
+    // the Mars rocks and machines are drawn in their own colours; only the Earth ground is turned red
+    for (const l of [this.terrainLayer, this.farLayer, this.snowLayer]) l.filters = red;
+    this.objLayer.filters = [];
     const h = b64decode(info.height);
     this.biome = b64decode(info.biome);
     this.river = b64decode(info.river);
@@ -425,7 +440,7 @@ export class WorldRenderer {
       }
       case Biome.Lake: name = n < 0.35 ? `lily${v}` : `shallow${v % 2}`; break;
       case Biome.Beach: name = `sand${v}`; break;
-      case Biome.Desert: name = `sand${v % 2}`; tint = 0xf2d6a8; break;
+      case Biome.Desert: name = this.mars ? 'sand0' : `sand${v % 2}`; tint = 0xf2d6a8; break; // no sea shells on Mars
       case Biome.Grassland: name = n < 0.22 ? `meadow${v}` : `grass${v}`; break;
       case Biome.Plains: name = `steppe${v}`; break;
       case Biome.Forest: name = `grass${v}`; tint = 0xd6e8c8; break;
@@ -512,6 +527,14 @@ export class WorldRenderer {
       objs.addChild(s);
       list.push({ s, i, kind, base: name, n: hash(x + 3, y + 77), size: mul, flip });
     };
+    if (this.mars) {
+      // red rocks, wind-carved pillars, small craters and boulders; a stone cairn now and then
+      const rocky = b === Biome.Mountain || b === Biome.Hills;
+      if (n < (rocky ? 0.07 : 0.025) && this.atlas.has('mrocks')) add(pick(['mrocks', 'mboulders', 'mpillar', 'mrocks'], n / (rocky ? 0.07 : 0.025)), 'other', (n2 - 0.5) * 8, 0);
+      else if (n > 0.985 && b === Biome.Desert && this.atlas.has('mcrater')) add('mcrater', 'other', 0, 0);
+      else if (n > 0.9975 && this.atlas.has('mcairn')) add('mcairn', 'other', 0, 0);
+      return;
+    }
     // trees: where they can grow comes from the server, their size from every tick
     const tk = this.treeKind[i];
     if (tk) {
@@ -960,7 +983,7 @@ export class WorldRenderer {
     }
     for (const [id, c] of this.camps) if (!seen.has(id)) { c.destroy(); this.camps.delete(id); }
     if (this.info) this.updateCleared();
-    this.fauna.updateBands(bands);
+    if (!this.mars) this.fauna.updateBands(bands);
     this.fleet.updateBands(bands);
     this.canoes.updateBands(bands);
     this.trains.updateBands(bands);
@@ -1295,7 +1318,7 @@ export class WorldRenderer {
       c.c.visible = on;
       if (on) c.frame(nowMs, zoom);
     }
-    this.fauna.frame(performance.now(), Math.min(0.1, dt / 60));
+    if (!this.mars) this.fauna.frame(performance.now(), Math.min(0.1, dt / 60));
     this.fleet.frame(performance.now(), Math.min(0.1, dt / 60));
     this.canoes.frame(performance.now(), Math.min(0.1, dt / 60));
     this.trains.frame(performance.now(), Math.min(0.1, dt / 60));
@@ -1443,18 +1466,33 @@ export class PersonSprite {
     if (t !== this.dressT || (t?.size ?? 0) !== this.dressN) {
       this.dressT = t;
       this.dressN = t?.size ?? 0;
-      this.dressP = !t ? '' : t.has('moon_base') ? 'e8' : t.has('computer') ? 'e7' : t.has('steam_engine') ? 'e6' : t.has('caravel') ? 'e5'
+      this.dressP = this.r.mars ? 'm9' : !t ? '' : t.has('moon_base') ? 'e8' : t.has('computer') ? 'e7' : t.has('steam_engine') ? 'e6' : t.has('caravel') ? 'e5'
         : t.has('heavy_plough') ? 'e4' : t.has('bronze') ? 'e2' : '';
     }
     if (!this.dressP) return name;
     const m = /^([a-z0-9]+?)(\d*)$/.exec(name);
-    if (!m) return name;
+    if (!m) return this.dressP === 'm9' && !/sleep/.test(name) ? this.marsStill(name) : name;
     // from the early modern age on nobody hunts or fishes with a spear in town any more: they just stand there
     const late = (this.dressP >= 'e5' ? LATE_DRESS[m[1]] : undefined) ?? OLD_ONLY[m[1]];
+    if (this.dressP === 'm9' && MARS_POSES.has(m[1])) return name;
     const base = late ?? DRESS[m[1]];
-    if (!base) return name;
-    const dressed = `${this.dressP}${base}${late ? '' : m[2]}`;
-    return this.r.atlas.has(dressed) ? dressed : name;
+    const dressed = base ? `${this.dressP}${base}${late ? '' : m[2]}` : '';
+    if (dressed && this.r.atlas.has(dressed)) return dressed;
+    if (!base && this.dressP !== 'm9') return name;
+    // on Mars nobody is out there in Earth clothes: a pose without a space suit becomes a colonist standing still
+    if (this.dressP === 'm9' && !m[1].startsWith('sleep')) return this.marsStill(name);
+    return name;
+  }
+
+  /** a colonist in a space suit standing still, for a pose that has no space-suit drawing */
+  private marsStill(name: string): string {
+    const step = /walk\D*(\d)$/.exec(name);
+    if (step) {
+      const walk = `m9${this.age < 14 ? (this.female ? 'girlwalk' : 'boywalk') : this.age > 60 ? 'oldwalk' : this.female ? 'womanwalk' : 'walk'}${Number(step[1]) % 4}`;
+      if (this.r.atlas.has(walk)) return walk;
+    }
+    const still = `m9${this.age < 14 ? (this.female ? 'girl' : 'boy') : this.age > 60 ? (this.female ? 'oldwoman' : 'elder') : this.female ? 'woman' : 'man'}`;
+    return this.r.atlas.has(still) ? still : name;
   }
 
   /** a stable pick per person, so the pose does not flicker */
@@ -1569,6 +1607,11 @@ export class PersonSprite {
       if (c) return c;
     }
     if (!arrived) return null;
+    if (this.r.mars && !['rest', 'child', 'elder', 'travel', 'lead', 'scout'].includes(task) && this.age >= 16 && this.age <= 60) {
+      // on Mars the work is drilling the rocks for samples and ice, or tending the plants under the glass
+      const c = this.female || hash(this.id, 171) < 0.3 ? loop('mbotanist', 4, 450) : loop('mdrill', 4, 260);
+      if (c) return c;
+    }
     switch (task) {
       case 'chop': return loop('chop', 8, 120);
       case 'hunt': return this.age < 56 ? loop('throw', 4, 320) : null;
@@ -1670,8 +1713,13 @@ export class PersonSprite {
       this.lens.push(this.lens[i - 1] + Math.hypot(this.path[i].x - this.path[i - 1].x, this.path[i].y - this.path[i - 1].y) * (wet ? 3 : 1));
     }
     this.tile = { x: tx, y: ty };
-    this.t0 = performance.now();
-    this.dur = Math.max(400, Math.min(tickMs * 0.85, 12000));
+    // everybody walks at their own steady pace, so a long way takes longer; and each sets off at their own
+    // moment somewhere in the month, so people come and go all the time instead of all at once
+    const tick = Math.max(800, tickMs);
+    const total = this.lens[this.lens.length - 1] ?? 0;
+    const pace = WALK_SPEED * (0.8 + hash(this.id, 213) * 0.4) * (this.age > 60 ? 0.75 : 1);
+    this.dur = Math.max(400, Math.min(tick * 0.9, (total / pace) * 1000));
+    this.t0 = performance.now() + hash(this.id, 211 + (row[1] & 31) + (row[2] & 31) * 32) * Math.max(0, tick * 0.95 - this.dur);
     this.cloth.tint = color;
     this.age = row[5];
     this.fame = !!row[8];
@@ -1686,8 +1734,9 @@ export class PersonSprite {
   }
 
   frame(now: number) {
-    const k = Math.min(1, (performance.now() - this.t0) / this.dur);
-    const e = k * k * (3 - 2 * k);
+    const k = Math.max(0, Math.min(1, (performance.now() - this.t0) / this.dur));
+    // a steady walk, only the first and last step a little softer
+    const e = k < 0.05 ? (k * k) / 0.1 : k > 0.95 ? 1 - ((1 - k) * (1 - k)) / 0.1 : k;
     let x = this.to.x, y = this.to.y;
     let afloat: string | null = null;
     const total = this.lens[this.lens.length - 1] ?? 0;
@@ -1720,11 +1769,27 @@ export class PersonSprite {
       y = round.y;
       this.facing = round.face;
     }
-    const walking = !!round || (k < 0.95 && dist > 3);
+    let walking = !!round || (k > 0 && k < 1 && dist > 3);
+    const asleep = this.r.nightNow && TASKS[this.task] !== 'scout';
+    // people with nothing to do do not stand still: they stroll a few steps now and then around where they are
+    const idleTask = TASKS[this.task];
+    if (k >= 1 && !round && !afloat && !asleep && (idleTask === 'rest' || idleTask === 'child' || idleTask === 'elder') && this.role !== 'guard' && this.role !== 'bodyguard' && !this.chief) {
+      const L = 6000 + hash(this.id, 223) * 6000;
+      const tt = (now + this.seed * 997) / L, j = Math.floor(tt), f = tt - j;
+      const spot = (q: number) => ({ x: (hash(this.id, q * 7 + 1) - 0.5) * 28, y: (hash(this.id, q * 7 + 2) - 0.5) * 14 });
+      const a = spot(j - 1), b = spot(j);
+      const m = Math.min(1, f / 0.4);
+      const ramp = Math.min(1, (performance.now() - this.t0 - this.dur) / 2500); // eases in after arriving, no jump
+      x += (a.x + (b.x - a.x) * m) * ramp;
+      y += (a.y + (b.y - a.y) * m) * ramp;
+      if (m < 1 && Math.hypot(b.x - a.x, b.y - a.y) * ramp > 4) {
+        walking = true;
+        if (Math.abs(b.x - a.x) > 1) this.facing = b.x < a.x ? -1 : 1;
+      }
+    }
     this.pos.x = x;
     this.pos.y = y;
     let bob = 0;
-    const asleep = this.r.nightNow && TASKS[this.task] !== 'scout';
     const chiefPose = this.chief && !asleep ? this.chiefPose(now, walking) : null;
     const kit = this.guardKit();
     const own = this.r.atlas.has(`${kit}walk0`);
@@ -1760,6 +1825,9 @@ export class PersonSprite {
   }
 }
 
+/** how fast people walk, in world units per second (a tile is 32 wide) */
+const WALK_SPEED = 16;
+
 /** stone age pose -> the pose with the same meaning on the sheets with the clothes of each age */
 const DRESS: Record<string, string> = {
   walk: 'walk', womanwalk: 'womanwalk', oldwalk: 'oldwalk', boywalk: 'boywalk', girlwalk: 'girlwalk',
@@ -1775,6 +1843,11 @@ const LATE_DRESS: Record<string, string> = {
 };
 /** stone age poses with no sheet of their own in the later ages: from the bronze age on a plain dressed pose */
 const OLD_ONLY: Record<string, string> = { rodfishf: 'woman', netpull: 'carrier' };
+/** a colony on Mars: the buildings after the main dome, in the order they come as it grows, and the things around it */
+const MARS_BUILDINGS = ['mdomeb3', 'mgreenhouse', 'mpad', 'mpower', 'mlab', 'mdomeb3', 'mairtower', 'mmed', 'mstore', 'mschool', 'mgreenhouse', 'mdomeb3'];
+const MARS_PROPS = ['msolar', 'mrover', 'mplants', 'mcrates', 'mdish', 'micedrill', 'mtank', 'mbot', 'mairmaker', 'msuit', 'mbigrover', 'msolar'];
+/** the work poses drawn in space suits (sheet DC): on Mars they are worn as they are */
+const MARS_POSES = new Set(['mdrill', 'mbotanist']);
 
 // Props a band shows in its camp once it knows the matching technology.
 const PROPS: [string, string, boolean | null][] = [
@@ -1984,6 +2057,8 @@ export class CampSprite {
   dwelling: BandView['dwelling'] = 'none';
   building: { s: Sprite; base: string; t0: number; flip: boolean }[] = [];
   ship: Sprite | null = null;
+  /** Mars: the landing pad and the rocket that comes and goes on it */
+  rocket: Sprite | null = null;
   /** how far the town reaches, in tiles (0 for a village or a camp) */
   townR = 0;
   shipKind = 'galleon';
@@ -2078,7 +2153,8 @@ export class CampSprite {
     this.tx = b.x;
     this.ty = b.y;
     this.settled = b.settled;
-    this.hasFire = b.hasFire;
+    this.hasFire = b.hasFire && !this.r.mars; // no open fire under the thin Martian air
+    this.hearth.visible = !this.r.mars;
     this.c.position.set(p.x, p.y);
     this.glow.position.set(p.x, p.y - 4);
     this.glow.visible = b.hasFire || b.dwelling === 'house';
@@ -2115,7 +2191,10 @@ export class CampSprite {
     const space = modern && techs.has('moon_base') && this.r.atlas.has('ecob3');
     if (space) props = props.filter((p) => !SPACE_DROPS.has(p));
     // a young colony over the sea: a wooden fort, log cabins, the flag and a jetty
-    const colony = !!b.colony && b.dwelling === 'house' && b.size < 80 && this.r.atlas.has('logcabin');
+    const colony = !!b.colony && b.dwelling === 'house' && b.size < 80 && this.r.atlas.has('logcabin') && !this.r.mars;
+    // Mars: no Earth things at all, only the machines and gardens of a colony
+    const mars = this.r.mars && this.r.atlas.has('mdomeb3');
+    if (mars) props = MARS_PROPS.filter((_, k) => k < 4 + Math.floor(b.size / 40));
     if (colony) props = ['colflag', 'jetty', ...props.filter((p) => !WALL_PROPS.has(p))];
     // the walls always stay; of the rest only the newest things (later techs are later in the list)
     const walls = props.filter((p) => WALL_PROPS.has(p));
@@ -2146,13 +2225,19 @@ export class CampSprite {
     this.key = key;
     const A = this.r.atlas;
     this.building = [];
+    this.rocket = null;
+    this.rocketY = NaN;
     for (const ch of [...this.homes.children]) {
       if (ch !== this.hearth && ch !== this.banner) ch.destroy();
     }
     for (let k = 0; k < n; k++) {
       const h = hash(this.id, k + 40);
       let name: string;
-      switch (b.dwelling) {
+      if (mars) {
+        // a big glass dome in the middle, round it small living domes, the greenhouse, the lab, the landing pad...
+        const big = b.size > 120 || capital;
+        name = k === 0 ? (big ? 'bigdomeb3' : 'mdomeb3') : (MARS_BUILDINGS[k - 1] ?? (h < 0.7 ? 'mdomeb3' : h < 0.85 ? 'mgreenhouse' : 'mstore'));
+      } else switch (b.dwelling) {
         case 'none': name = 'furbed'; break;
         case 'tent': name = cold && h < 0.5 ? 'bonehut' : h < 0.2 ? 'leanto' : `tent${k % 2}`; break;
         case 'hut': name = A.has('hutb3') ? 'hutb3' : 'roundhut'; break;
@@ -2247,7 +2332,14 @@ export class CampSprite {
       s.position.set(q.x, q.y);
       s.zIndex = s.y;
       this.homes.addChild(s);
-      if (k >= builtBefore && /^(hut|house|town|temple|villa|palace|theatre|school|keep|church|timber|abbey|baroque|observ|brick|flats|factory|station|skyscraper|airport|block|arco|spaceport|eco)b3$/.test(name)) {
+      if (name === 'mpad' && A.has('rocketup0')) {
+        const rk = A.sprite('rocketdown3');
+        rk.position.set(q.x, q.y - 2);
+        rk.zIndex = s.y + 0.5;
+        this.homes.addChild(rk);
+        this.rocket = rk;
+      }
+      if (k >= builtBefore && /^(hut|house|town|temple|villa|palace|theatre|school|keep|church|timber|abbey|baroque|observ|brick|flats|factory|station|skyscraper|airport|block|arco|spaceport|eco|mdome|bigdome)b3$/.test(name)) {
         this.building.push({ s, base: name.slice(0, -1), t0: Date.now(), flip: s.scale.x < 0 });
         A.set(s, `${name.slice(0, -1)}0`);
         if (h < 0.5) s.scale.x *= -1;
@@ -2326,7 +2418,7 @@ export class CampSprite {
   /** farmed tiles around a village: soil in spring, wheat in summer, stubble after the harvest */
   private updateFields(b: BandView) {
     const m = this.r.month;
-    const count = b.settled && (b.techIds ?? b.techs).includes('agriculture') ? Math.min(10, 2 + Math.floor(b.size / 10)) : 0;
+    const count = b.settled && !this.r.mars && (b.techIds ?? b.techs).includes('agriculture') ? Math.min(10, 2 + Math.floor(b.size / 10)) : 0;
     // ploughed in early spring, sprouts, tall wheat in summer, stubble and sheaves after the harvest
     const stage = m >= 2 && m <= 3 ? 0 : m <= 5 && m >= 4 ? 1 : m >= 6 && m <= 8 ? 2 : m >= 9 && m <= 10 ? 3 : 0;
     const bx = Math.round(b.x), by = Math.round(b.y);
@@ -2369,6 +2461,7 @@ export class CampSprite {
         return st < 3;
       });
     }
+    if (this.rocket && !this.rocket.destroyed) this.flyRocket(now);
     if (this.ship && !this.ship.destroyed && this.shipKind !== 'containership') this.r.atlas.set(this.ship, `${this.shipKind}${Math.floor(now / 400 + this.id) % 4}`);
     const frameNo = this.hasFire ? 1 + (Math.floor(now / 130 + this.id * 7) % 3) : 0;
     if (frameNo !== this.fireFrame) {
@@ -2379,6 +2472,30 @@ export class CampSprite {
     this.bannerCloth.skew.y = Math.sin(now / 500 + this.id) * 0.05;
     this.symbol.skew.y = this.bannerCloth.skew.y;
     this.scaleTag(zoom);
+  }
+
+  private rocketY = NaN;
+  /** a rocket lands on the pad, stands a while, lifts off and is gone for a while: one round in 80 s */
+  private flyRocket(now: number) {
+    const rk = this.rocket!;
+    if (Number.isNaN(this.rocketY)) this.rocketY = rk.y;
+    const t = ((now / 1000 + this.id * 17) % 80);
+    const A = this.r.atlas;
+    if (t < 4) {
+      const k = t / 4; // coming down, slower and slower
+      A.set(rk, `rocketdown${Math.min(3, Math.floor(k * 4))}`);
+      rk.visible = true;
+      rk.y = this.rocketY - 90 * (1 - k) ** 2;
+    } else if (t < 50) {
+      A.set(rk, 'rocketdown3');
+      rk.visible = true;
+      rk.y = this.rocketY;
+    } else if (t < 55) {
+      const k = (t - 50) / 5; // the engines start, then up and away faster and faster
+      A.set(rk, `rocketup${Math.min(3, Math.floor(k * 4))}`);
+      rk.visible = true;
+      rk.y = this.rocketY - (k < 0.4 ? 0 : 140 * ((k - 0.4) / 0.6) ** 2);
+    } else rk.visible = false;
   }
 
   scaleTag(zoom: number) {
