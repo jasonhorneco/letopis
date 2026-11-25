@@ -1846,7 +1846,8 @@ export class Simulation {
       const medicine = (this.hasTech(b, 'medicine') ? 0.65 : this.hasTech(b, 'herb_lore') ? 0.8 : 1) * (this.hasTech(b, 'aqueduct') ? 0.85 : 1) * (this.hasTech(b, 'monastery') ? 0.9 : 1) * (this.hasTech(b, 'microscope') ? 0.85 : 1)
         * (this.hasTech(b, 'antibiotics') ? 0.6 : this.hasTech(b, 'vaccine') ? 0.75 : 1) * (this.hasTech(b, 'sewer') ? 0.85 : 1) * (this.hasTech(b, 'genome') ? 0.9 : 1) * (this.hasTech(b, 'gene_therapy') ? 0.75 : 1);
       const settledDisease = b.settled ? 1.4 : 1;
-      for (const p of m) {
+      // die() removes the current person from m. Visit the original members in order.
+      for (const p of [...m]) {
         const a = this.ageOf(p);
         const lon = p.genes.lon, hea = p.genes.hea;
         // annual mortality
