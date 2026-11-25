@@ -3338,7 +3338,7 @@ export class Simulation {
   }
 
   get extinct(): boolean {
-    return this.s.people.length === 0;
+    return this.s.people.length === 0 && !this.s.fleet?.some(ship => ship.people.length > 0);
   }
 }
 
