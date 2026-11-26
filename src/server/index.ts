@@ -445,7 +445,7 @@ interface Viewer {
   overview: boolean;
   region: PeopleRegion | null;
   revision: number;
-  answeredAt: number;
+  viewportReply?: ReturnType<typeof setTimeout>;
 }
 const clients = new Map<WebSocket, Viewer>();
 const marsClients = new Map<WebSocket, Viewer>();
@@ -465,7 +465,7 @@ server.on('upgrade', (req, socket, head) => {
   const onMars = p === '/mars/ws' && !!mars;
   wss.handleUpgrade(req, socket, head, (ws) => {
     const set = onMars ? marsClients : clients;
-    const viewer: Viewer = { map, overview: u.searchParams.get('overview') === '1', region: null, revision: 0, answeredAt: -Infinity };
+    const viewer: Viewer = { map, overview: u.searchParams.get('overview') === '1', region: null, revision: 0 };
     set.set(ws, viewer);
     const sm = onMars ? mars! : sim;
     ws.send(JSON.stringify(snapshot(sm, viewFor(sm.use(), map), viewer.overview)));
@@ -478,17 +478,26 @@ server.on('upgrade', (req, socket, head) => {
       if (region === undefined) return;
       viewer.revision = request.revision!;
       viewer.region = region;
-      const now = Date.now();
-      if (now - viewer.answeredAt < 120) return; // subsequent ticks still use the latest region
-      viewer.answeredAt = now;
-      const current = onMars ? mars : sim;
-      if (!current) return;
-      const v = viewFor(current.use(), map);
-      ws.send(JSON.stringify({ t: 'people', revision: viewer.revision, people: localPeople(regionRows(current, v, region), v) }));
-      sim.use();
+      clearTimeout(viewer.viewportReply);
+      // Only the newest request in a burst gets a reply, even with no tick forthcoming.
+      viewer.viewportReply = setTimeout(() => {
+        viewer.viewportReply = undefined;
+        const current = onMars ? mars : sim;
+        if (!current || ws.readyState !== WebSocket.OPEN) return;
+        try {
+          const v = viewFor(current.use(), map);
+          ws.send(JSON.stringify({ t: 'people', revision: viewer.revision, people: localPeople(regionRows(current, v, viewer.region), v) }));
+        } finally {
+          sim.use();
+        }
+      }, 120);
     });
-    ws.on('close', () => set.delete(ws));
-    ws.on('error', () => set.delete(ws));
+    const remove = () => {
+      clearTimeout(viewer.viewportReply);
+      set.delete(ws);
+    };
+    ws.on('close', remove);
+    ws.on('error', remove);
   });
 });
 
@@ -509,6 +518,8 @@ function broadcast(sim: Simulation, clients: Map<WebSocket, Viewer>, pendingEven
     if (ws.readyState !== WebSocket.OPEN) continue;
     const v = viewFor(sim, viewer.map);
     if (viewer.overview) {
+      clearTimeout(viewer.viewportReply);
+      viewer.viewportReply = undefined;
       const m = tickFor(sim, v, base, { ...common, people: regionRows(sim, v, viewer.region) }, explored, sim.treeChanges, sim.roadChanges);
       m.peopleRevision = viewer.revision;
       ws.send(JSON.stringify(m));

@@ -12,14 +12,12 @@ import { B, LANG, VILLAGE } from './lang';
 import { Rng } from '../shared/rng';
 import { CONIFERS, TREE_KINDS } from '../shared/trees';
 import { shortNum } from '../shared/people';
-import { BandView, Biome, PersonRow, TASKS, WorldInfo, b64decode, isWater, RIVER_WATER } from '../shared/types';
+import { BandView, Biome, PEOPLE_PER_BAND, PersonRow, TASKS, WorldInfo, b64decode, isWater, RIVER_WATER } from '../shared/types';
 
 export const TW = 32; // tile width
 export const TH = 16; // tile height
 export const ELEV = 5;
 type Role = 'guard' | 'bodyguard' | 'teller' | 'listener';
-/** most people of one band drawn on the map */
-const PER_BAND = 36; // pixels per height level
 const CHUNK = 16;
 /** from this much flow a river fills its tile; below it is a thin stream */
 const BIG_RIVER = 120;
@@ -1722,7 +1720,7 @@ export class WorldRenderer {
     this.lastPeople = { rows, bandColors, tickMs };
     const seen = new Set<number>();
     const night = this.isNight();
-    // a big village shows at most PER_BAND people on the map (the chief, the chosen one and a steady sample):
+    // a big village shows at most PEOPLE_PER_BAND people on the map (the chief, the chosen one and a steady sample):
     // the rest are at home. Thousands of sprites less, and no crowd piled on the camp
     const byBand = new Map<number, PersonRow[]>();
     for (const r of rows) {
@@ -1733,10 +1731,10 @@ export class WorldRenderer {
     const roles = this.roles(rows, byBand);
     const shown: PersonRow[] = [];
     for (const l of byBand.values()) {
-      if (l.length <= PER_BAND) { shown.push(...l); continue; }
+      if (l.length <= PEOPLE_PER_BAND) { shown.push(...l); continue; }
       const rank = (r: PersonRow) => (r[7] === 1 || r[8] || r[0] === this.selectedId || roles.has(r[0]) ? -1 : hash(r[0], 99));
       l.sort((a, b) => rank(a) - rank(b));
-      shown.push(...l.slice(0, PER_BAND));
+      shown.push(...l.slice(0, PEOPLE_PER_BAND));
     }
     // at night people sleep indoors: in a tent camp most of them, in a village of huts or houses everyone but the guards
     const sleepers = night ? shown.filter((r) => {

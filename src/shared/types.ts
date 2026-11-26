@@ -131,6 +131,9 @@ export interface BandView {
 /** compact person: [id, x*10, y*10, taskIndex, bandId, ageYears, sex(0 m,1 f), chief(1) or not(0), famous (index + 1) or 0] */
 export type PersonRow = [number, number, number, number, number, number, number, number, number?];
 
+/** The renderer's resident budget for a single settlement. */
+export const PEOPLE_PER_BAND = 36;
+
 export const TASKS: Task[] = ['rest', 'gather', 'hunt', 'fish', 'craft', 'farm', 'herd', 'build', 'child', 'elder', 'travel', 'lead', 'scout', 'chop'];
 
 export interface ChronicleEntry {

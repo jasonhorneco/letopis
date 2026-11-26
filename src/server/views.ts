@@ -4,7 +4,7 @@
 
 import type { Simulation } from './sim/sim';
 import { mapKey } from './sim/world';
-import { PersonRow, SnapshotMessage, TickMessage, WorldInfo, b64encode } from '../shared/types';
+import { PEOPLE_PER_BAND, PersonRow, SnapshotMessage, TickMessage, WorldInfo, b64encode } from '../shared/types';
 
 export interface View { key: string; x0: number; y0: number; w: number; h: number; map: [number, number] | null }
 
@@ -59,19 +59,46 @@ export const movingOf = (sm: Simulation, people = sm.personRows()): Moving => ({
 
 export type PeopleRegion = { left: number; top: number; right: number; bottom: number; focus?: number } | { focus: number };
 
+export const VIEWPORT_PEOPLE_LIMIT = 1024;
+interface RankedResident { id: number; rank: number }
+const compareResidents = (a: RankedResident, b: RankedResident) => a.rank - b.rank || a.id - b.id;
+
 export function regionRows(sm: Simulation, v: View, region: PeopleRegion | null): PersonRow[] {
   if (!region) return [];
-  const { focus } = region;
-  if (!('left' in region)) {
-    const row = sm.personRow(region.focus);
-    return row && inside(v, row[1] / 10, row[2] / 10) ? [row] : [];
+  const focus = region.focus === undefined ? undefined : sm.personRow(region.focus);
+  const visibleFocus = focus && inside(v, focus[1] / 10, focus[2] / 10) ? focus : undefined;
+  const rows = visibleFocus ? [visibleFocus] : [];
+  if (!('left' in region)) return rows;
+
+  const left = region.left + v.x0, top = region.top + v.y0;
+  const right = region.right + v.x0, bottom = region.bottom + v.y0;
+  const chiefs = new Set(sm.s.bands.map(b => b.chiefId));
+  const groups = new Map<number, RankedResident[]>();
+  for (const person of sm.s.people) {
+    if (person.id === visibleFocus?.[0]) continue;
+    const x = Math.round(person.x * 10) / 10, y = Math.round(person.y * 10) / 10;
+    if (x < left || x > right || y < top || y > bottom || !inside(v, x, y)) continue;
+    let group = groups.get(person.bandId);
+    if (!group) groups.set(person.bandId, group = []);
+    const limit = PEOPLE_PER_BAND - (visibleFocus?.[4] === person.bandId ? 1 : 0);
+    // Mix the ID so the sample is stable across ticks and independent of array order or age.
+    const mixed = Math.imul(person.id ^ (person.id >>> 16), 0x45d9f3b);
+    const rank = ((mixed ^ (mixed >>> 16)) >>> 0) - (chiefs.has(person.id) ? 2 : person.fame ? 1 : 0) * 2 ** 32;
+    const last = group[group.length - 1];
+    if (group.length === limit && (rank > last.rank || (rank === last.rank && person.id >= last.id))) continue;
+    group.push({ id: person.id, rank });
+    group.sort(compareResidents);
+    if (group.length > limit) group.pop();
   }
-  const { left, top, right, bottom } = region;
-  return sm.personRows((x10, y10, id) => {
-    const x = x10 / 10, y = y10 / 10;
-    return inside(v, x, y) && (id === focus ||
-      (x >= left + v.x0 && x <= right + v.x0 && y >= top + v.y0 && y <= bottom + v.y0));
-  });
+  // Give each settlement a turn before taking a second resident from any of them.
+  const samples = [...groups].sort(([a], [b]) => a - b).map(([, group]) => group);
+  for (let i = 0; i < PEOPLE_PER_BAND; i++) {
+    for (const group of samples) {
+      if (rows.length === VIEWPORT_PEOPLE_LIMIT) return rows;
+      if (group[i]) rows.push(sm.personRow(group[i].id)!);
+    }
+  }
+  return rows;
 }
 
 export function localPerson(row: PersonRow | undefined, v: View): PersonRow | undefined {

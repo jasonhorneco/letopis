@@ -90,6 +90,11 @@ r.peopleLayer.sortableChildren = true;
 
 const cam = { x: 0, y: 0, zoom: 1, tx: 0, ty: 0, tz: 1 };
 let overviewUntilInteraction = false;
+let zoomChangedAt = -Infinity;
+function noteZoom() {
+  overviewUntilInteraction = false;
+  zoomChangedAt = performance.now();
+}
 /** person the camera follows; the card stays beside the selected person */
 let follow: number | null = null;
 let cardPos: { x: number; y: number } | null = null;
@@ -177,7 +182,7 @@ canvas.addEventListener('wheel', (e) => {
 }, { passive: false });
 /** zoom keeping the point under the cursor (or between the fingers) in place */
 function zoomBy(f: number, sx = app.screen.width / 2, sy = app.screen.height / 2) {
-  overviewUntilInteraction = false;
+  noteZoom();
   const z0 = cam.zoom;
   const z1 = Math.max(0.18, Math.min(MAX_ZOOM, z0 * f));
   const W = app.screen.width, H = app.screen.height;
@@ -188,8 +193,8 @@ function zoomBy(f: number, sx = app.screen.width / 2, sy = app.screen.height / 2
   }
   cam.zoom = cam.tz = z1;
 }
-$('#zoomIn').onclick = () => { overviewUntilInteraction = false; cam.tz = Math.min(MAX_ZOOM, cam.tz * 1.4); };
-$('#zoomOut').onclick = () => { overviewUntilInteraction = false; cam.tz = Math.max(0.18, cam.tz / 1.4); };
+$('#zoomIn').onclick = () => { noteZoom(); cam.tz = Math.min(MAX_ZOOM, cam.tz * 1.4); };
+$('#zoomOut').onclick = () => { noteZoom(); cam.tz = Math.max(0.18, cam.tz / 1.4); };
 
 function pick(sx: number, sy: number) {
   const wx = (sx - r.world.x) / cam.zoom, wy = (sy - r.world.y) / cam.zoom;
@@ -304,12 +309,14 @@ let peopleSocket: WebSocket | null = null;
 let peopleRevision = 0;
 let lastRegion = '';
 let lastRequest = -Infinity;
-function sendViewport() {
-  if (peopleSocket?.readyState !== WebSocket.OPEN || performance.now() - lastRequest < 180) return;
-  const zoom = cam.zoom;
+function sendViewport(immediate = false) {
+  const now = performance.now();
+  if (peopleSocket?.readyState !== WebSocket.OPEN || (!immediate && (now - zoomChangedAt < 120 || now - lastRequest < 180))) return;
+  // Subscribe at the destination so the easing frames of a single zoom share one request.
+  const zoom = cam.tz;
   let region: { left?: number; top?: number; right?: number; bottom?: number; focus?: number } | null = null;
   if (zoom > 0.4 && !overviewUntilInteraction) {
-    const [x, y] = camTile();
+    const [x, y] = camTile(cam.tx, cam.ty);
     // Isometric screen-corner envelope plus room for elevation, workers and movement.
     const radius = (app.screen.width / TW + app.screen.height / TH) / (2 * zoom) + 12;
     const lo = (a: number) => Math.floor((a - radius) / 8) * 8;
@@ -321,7 +328,7 @@ function sendViewport() {
   const key = JSON.stringify(region);
   if (key === lastRegion) return;
   lastRegion = key;
-  lastRequest = performance.now();
+  lastRequest = now;
   peopleSocket.send(JSON.stringify({ t: 'viewport', revision: ++peopleRevision, region }));
 }
 
@@ -336,7 +343,7 @@ function connect() {
       if (m.peopleDeferred) {
         peopleSocket = ws;
         peopleRevision = 0;
-        lastRegion = '';
+        lastRegion = people.length ? '' : 'null';
         lastRequest = -Infinity;
         sendViewport();
       }
@@ -849,7 +856,13 @@ async function showPerson(id: number) {
     </dl>
     <button class="btn tree-btn" data-tree="${d.id}">${T('Родословие', 'Family tree', 'Stammbaum')}</button>
     ${d.deeds.length ? `<h3>${T('Дела', 'Deeds', 'Taten')}</h3><ul class="deeds">${d.deeds.map((x) => `<li>${esc(DEED(x))}</li>`).join('')}</ul>` : ''}`, beside);
-  if (live && alive) { follow = id; r.select(id); }
+  if (live && alive) {
+    follow = id;
+    r.select(id);
+    cam.tx = live.pos.x;
+    cam.ty = live.pos.y - 6;
+    sendViewport(true);
+  }
   // who this person was in the real world: a few lines and something curious
   if (fam) api<{ text: string; facts: string[] }>(`/api/bio?name=${encodeURIComponent(fam.bg)}&lang=${LANG}`).then((b) => {
     const el = document.getElementById('famBio');
@@ -1173,8 +1186,8 @@ planetBtn.onclick = () => { location.href = BASE ? '/' : '/mars/'; };
 // ---------- more maps: the whole world or one map at a time ----------
 
 /** the tile in the middle of the screen */
-function camTile(): [number, number] {
-  const a = cam.x / (TW / 2), b = cam.y / (TH / 2);
+function camTile(x = cam.x, y = cam.y): [number, number] {
+  const a = x / (TW / 2), b = y / (TH / 2);
   return [(a + b) / 2, (b - a) / 2];
 }
 
@@ -1276,7 +1289,7 @@ function setupMenu(inApp: boolean) {
     slider.type = 'range'; slider.min = '0'; slider.max = '1000';
     slider.setAttribute('aria-label', T('Мащаб', 'Zoom', 'Zoom'));
     const lo = Math.log(0.18), hi = Math.log(MAX_ZOOM);
-    slider.oninput = () => { overviewUntilInteraction = false; cam.tz = Math.exp(lo + (hi - lo) * Number(slider.value) / 1000); };
+    slider.oninput = () => { noteZoom(); cam.tz = Math.exp(lo + (hi - lo) * Number(slider.value) / 1000); };
     let held = false;
     slider.onpointerdown = () => { held = true; };
     slider.onpointerup = slider.onpointercancel = () => { held = false; };
