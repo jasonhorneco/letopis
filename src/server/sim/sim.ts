@@ -2709,11 +2709,22 @@ export class Simulation {
     return c ? { id: c.id, name: this.nameOf(c), title: this.chiefTitleOf(b) } : null;
   }
 
-  personRows(): PersonRow[] {
+  personRow(id: number): PersonRow | undefined {
+    const p = this.byId.get(id);
+    if (!p) return undefined;
+    return [p.id, Math.round(p.x * 10), Math.round(p.y * 10), TASKS.indexOf(p.task), p.bandId, Math.floor(this.ageOf(p)), p.sex,
+      this.bandById.get(p.bandId)?.chiefId === p.id ? 1 : 0, p.fame ?? 0];
+  }
+
+  personRows(inView?: (x10: number, y10: number, id: number) => boolean): PersonRow[] {
     const chiefs = new Set(this.s.bands.map((b) => b.chiefId));
-    return this.s.people.map((p) => [
-      p.id, Math.round(p.x * 10), Math.round(p.y * 10), TASKS.indexOf(p.task), p.bandId, Math.floor(this.ageOf(p)), p.sex, chiefs.has(p.id) ? 1 : 0, p.fame ?? 0,
-    ]);
+    const rows: PersonRow[] = [];
+    for (const p of this.s.people) {
+      const x = Math.round(p.x * 10), y = Math.round(p.y * 10);
+      if (inView && !inView(x, y, p.id)) continue;
+      rows.push([p.id, x, y, TASKS.indexOf(p.task), p.bandId, Math.floor(this.ageOf(p)), p.sex, chiefs.has(p.id) ? 1 : 0, p.fame ?? 0]);
+    }
+    return rows;
   }
 
   exploredB64(): string {

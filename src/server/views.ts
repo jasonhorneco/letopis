@@ -55,7 +55,38 @@ export function worldInfoFor(sm: Simulation, v: View): WorldInfo {
 
 /** villages, people and ships of the view, in its own coordinates */
 export type Moving = Required<Pick<SnapshotMessage, 'bands' | 'people' | 'seas'>>;
-export const movingOf = (sm: Simulation): Moving => ({ bands: sm.bandViews(), people: sm.personRows(), seas: sm.seaViews() });
+export const movingOf = (sm: Simulation, people = sm.personRows()): Moving => ({ bands: sm.bandViews(), people, seas: sm.seaViews() });
+
+export type PeopleRegion = { left: number; top: number; right: number; bottom: number; focus?: number } | { focus: number };
+
+export function regionRows(sm: Simulation, v: View, region: PeopleRegion | null): PersonRow[] {
+  if (!region) return [];
+  const { focus } = region;
+  if (!('left' in region)) {
+    const row = sm.personRow(region.focus);
+    return row && inside(v, row[1] / 10, row[2] / 10) ? [row] : [];
+  }
+  const { left, top, right, bottom } = region;
+  return sm.personRows((x10, y10, id) => {
+    const x = x10 / 10, y = y10 / 10;
+    return inside(v, x, y) && (id === focus ||
+      (x >= left + v.x0 && x <= right + v.x0 && y >= top + v.y0 && y <= bottom + v.y0));
+  });
+}
+
+export function localPerson(row: PersonRow | undefined, v: View): PersonRow | undefined {
+  return row && inside(v, row[1] / 10, row[2] / 10) ? localPeople([row], v)[0] : undefined;
+}
+
+export function localPeople(rows: PersonRow[], v: View): PersonRow[] {
+  if (!v.x0 && !v.y0) return rows;
+  return rows.map((row) => {
+    const r = [...row] as PersonRow;
+    r[1] -= v.x0 * 10;
+    r[2] -= v.y0 * 10;
+    return r;
+  });
+}
 
 function moving(all: Moving, v: View): Moving {
   const { bands, people, seas } = all;

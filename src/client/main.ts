@@ -49,14 +49,14 @@ const BASE = location.pathname.startsWith('/mars') ? '/mars' : '';
 /** the Earth can grow by whole maps: this page shows the whole world ('all') or one map ('gx,gy') */
 let viewMap = BASE ? 'all' : store<string>('letopis.view', 'all');
 /** questions about places on the map carry the view, so the server answers in its coordinates */
-const viewed = (path: string) => (/^\/api\/(world|snapshot|band\/)/.test(path) && viewMap !== 'all' ? `${path}${path.includes('?') ? '&' : '?'}map=${viewMap}` : path);
+const viewed = (path: string) => (/^\/api\/(world|snapshot|band\/|person\/)/.test(path) && viewMap !== 'all' ? `${path}${path.includes('?') ? '&' : '?'}map=${viewMap}` : path);
 async function api<T>(path: string): Promise<T> {
   const r = await fetch(BASE + viewed(path));
   if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json() as Promise<T>;
 }
 // the world, the people and the latest chronicle are asked for at once, while the sprites still load
-const early = { world: api<WorldInfo>('/api/world'), snap: api<SnapshotMessage>('/api/snapshot'), recent: api<ChronicleEntry[]>('/api/chronicle?limit=120') };
+const early = { world: api<WorldInfo>('/api/world'), snap: api<SnapshotMessage>('/api/snapshot?overview=1'), recent: api<ChronicleEntry[]>('/api/chronicle?limit=120') };
 
 // ---------- state ----------
 
@@ -89,6 +89,7 @@ r.peopleLayer.sortableChildren = true;
 // ---------- camera ----------
 
 const cam = { x: 0, y: 0, zoom: 1, tx: 0, ty: 0, tz: 1 };
+let overviewUntilInteraction = false;
 /** person the camera follows; the card stays beside the selected person */
 let follow: number | null = null;
 let cardPos: { x: number; y: number } | null = null;
@@ -98,6 +99,7 @@ function applyCam() {
   r.world.position.set(app.screen.width / 2 - cam.x * cam.zoom, app.screen.height / 2 - cam.y * cam.zoom);
 }
 function lookAt(x: number, y: number, zoom?: number, instant = false) {
+  if (!instant) overviewUntilInteraction = false;
   const p = r.tileTop(x, y);
   cam.tx = p.x;
   cam.ty = p.y;
@@ -141,7 +143,7 @@ canvas.addEventListener('pointermove', (e) => {
   cam.x -= dx / cam.zoom; cam.y -= dy / cam.zoom;
   cam.tx = cam.x; cam.ty = cam.y;
   last = { x: e.clientX, y: e.clientY };
-  if (moved > 6) { stopTour(); follow = null; }
+  if (moved > 6) { overviewUntilInteraction = false; stopTour(); follow = null; }
 });
 /** a quick second tap zooms in there; a single tap still picks, a moment later */
 let lastTap = { t: 0, x: 0, y: 0 }, tapTimer = 0;
@@ -175,6 +177,7 @@ canvas.addEventListener('wheel', (e) => {
 }, { passive: false });
 /** zoom keeping the point under the cursor (or between the fingers) in place */
 function zoomBy(f: number, sx = app.screen.width / 2, sy = app.screen.height / 2) {
+  overviewUntilInteraction = false;
   const z0 = cam.zoom;
   const z1 = Math.max(0.18, Math.min(MAX_ZOOM, z0 * f));
   const W = app.screen.width, H = app.screen.height;
@@ -185,8 +188,8 @@ function zoomBy(f: number, sx = app.screen.width / 2, sy = app.screen.height / 2
   }
   cam.zoom = cam.tz = z1;
 }
-$('#zoomIn').onclick = () => { cam.tz = Math.min(MAX_ZOOM, cam.tz * 1.4); };
-$('#zoomOut').onclick = () => { cam.tz = Math.max(0.18, cam.tz / 1.4); };
+$('#zoomIn').onclick = () => { overviewUntilInteraction = false; cam.tz = Math.min(MAX_ZOOM, cam.tz * 1.4); };
+$('#zoomOut').onclick = () => { overviewUntilInteraction = false; cam.tz = Math.max(0.18, cam.tz / 1.4); };
 
 function pick(sx: number, sy: number) {
   const wx = (sx - r.world.x) / cam.zoom, wy = (sy - r.world.y) / cam.zoom;
@@ -245,7 +248,9 @@ function applyTime(t: TickMessage['time'], population: number) {
 
 function onSnapshot(m: SnapshotMessage) {
   bands = m.bands;
-  people = m.people;
+  // An overview snapshot has no resident rows; keep the previous detail until
+  // this connection answers the new subscription (notably the selected person).
+  if (!m.peopleDeferred) people = m.people;
   if (m.trees) r.setTrees(m.trees);
   if (m.roads) r.setRoads(m.roads);
   r.setExplored(b64decode(m.explored));
@@ -261,7 +266,7 @@ function onSnapshot(m: SnapshotMessage) {
 
 function onTick(m: TickMessage) {
   bands = m.bands;
-  people = m.people;
+  if (m.peopleRevision === undefined || m.peopleRevision === peopleRevision) people = m.people;
   if (m.explored) r.setExplored(b64decode(m.explored));
   if (m.trees) r.updateTrees(m.trees);
   if (m.roads) r.updateRoads(m.roads);
@@ -295,11 +300,51 @@ setInterval(() => void checkVersion(), 60_000);
   if (!Number.isNaN(t.getTime())) $('#build').title = `${T('от', 'built', 'Stand:')} ${t.toLocaleString(LOCALE)}`;
 }
 
+let peopleSocket: WebSocket | null = null;
+let peopleRevision = 0;
+let lastRegion = '';
+let lastRequest = -Infinity;
+function sendViewport() {
+  if (peopleSocket?.readyState !== WebSocket.OPEN || performance.now() - lastRequest < 180) return;
+  const zoom = cam.zoom;
+  let region: { left?: number; top?: number; right?: number; bottom?: number; focus?: number } | null = null;
+  if (zoom > 0.4 && !overviewUntilInteraction) {
+    const [x, y] = camTile();
+    // Isometric screen-corner envelope plus room for elevation, workers and movement.
+    const radius = (app.screen.width / TW + app.screen.height / TH) / (2 * zoom) + 12;
+    const lo = (a: number) => Math.floor((a - radius) / 8) * 8;
+    const hi = (a: number) => Math.ceil((a + radius) / 8) * 8;
+    region = { left: lo(x), top: lo(y), right: hi(x), bottom: hi(y), focus: follow ?? undefined };
+  } else if (follow !== null) {
+    region = { focus: follow };
+  }
+  const key = JSON.stringify(region);
+  if (key === lastRegion) return;
+  lastRegion = key;
+  lastRequest = performance.now();
+  peopleSocket.send(JSON.stringify({ t: 'viewport', revision: ++peopleRevision, region }));
+}
+
 function connect() {
-  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${BASE}/ws${viewMap !== 'all' ? `?map=${viewMap}` : ''}`);
+  const query = new URLSearchParams({ overview: '1' });
+  if (viewMap !== 'all') query.set('map', viewMap);
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${BASE}/ws?${query}`);
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
-    if (m.t === 'snapshot') onSnapshot(m);
+    if (m.t === 'snapshot') {
+      onSnapshot(m);
+      if (m.peopleDeferred) {
+        peopleSocket = ws;
+        peopleRevision = 0;
+        lastRegion = '';
+        lastRequest = -Infinity;
+        sendViewport();
+      }
+    }
+    else if (m.t === 'people' && m.revision === peopleRevision) {
+      people = m.people;
+      r.updatePeople(people, bandColors(), 400);
+    }
     else if (m.t === 'tick') onTick(m);
     else if (m.t === 'newworld') location.reload();
     // a ship opened a new map: load the world again, looking at the same place
@@ -310,6 +355,7 @@ function connect() {
   };
   ws.onopen = () => { $('#conn').classList.remove('off'); void checkVersion(); };
   ws.onclose = () => {
+    if (peopleSocket === ws) peopleSocket = null;
     $('#conn').classList.add('off');
     setTimeout(connect, 3000);
   };
@@ -768,13 +814,20 @@ $('#card').addEventListener('click', (e) => {
 });
 
 async function showPerson(id: number) {
-  const d = await api<PersonDetail>(`/api/person/${id}`).catch(() => null);
+  const d = await api<PersonDetail>(`/api/person/${id}?position=1`).catch(() => null);
   if (!d) return;
   // the first people have no parents: the world starts with them
   const link = (p: { id: number; name: string } | null) => (p ? `<a href="#" data-person="${p.id}">${esc(P(p.name))}</a>` : `<span class="muted">${d.generation <= 1 ? T('от първите хора', 'one of the first people', 'aus der ersten Generation') : T('неизвестен', 'unknown', 'unbekannt')}</span>`);
   const fam = famousByName(d.name);
   const genes = Object.entries(d.genes).map(([k, v]) => `<div class="gene"><span>${esc(GENE(k))}</span><div class="bar"><i style="width:${v}%"></i></div></div>`).join('');
   const alive = d.diedYear === null;
+  // A resident selected through the Chronicle is available even outside the subscribed viewport.
+  if (alive && d.position && !people.some((p) => p[0] === id)) {
+    overviewUntilInteraction = false;
+    people = [...people, d.position];
+    r.select(id);
+    r.updatePeople(people, bandColors(), 400);
+  }
   // someone at home (not drawn) steps out to be followed
   if (alive && !r.people.has(id) && people.some((p) => p[0] === id)) r.select(id);
   const live = r.people.get(id);
@@ -1223,7 +1276,7 @@ function setupMenu(inApp: boolean) {
     slider.type = 'range'; slider.min = '0'; slider.max = '1000';
     slider.setAttribute('aria-label', T('Мащаб', 'Zoom', 'Zoom'));
     const lo = Math.log(0.18), hi = Math.log(MAX_ZOOM);
-    slider.oninput = () => { cam.tz = Math.exp(lo + (hi - lo) * Number(slider.value) / 1000); };
+    slider.oninput = () => { overviewUntilInteraction = false; cam.tz = Math.exp(lo + (hi - lo) * Number(slider.value) / 1000); };
     let held = false;
     slider.onpointerdown = () => { held = true; };
     slider.onpointerup = slider.onpointercancel = () => { held = false; };
@@ -1306,6 +1359,7 @@ function frameStep(t: { deltaMS: number; deltaTime: number }) {
   cam.zoom += (cam.tz - cam.zoom) * k;
   applyCam();
   r.frame(t.deltaTime, Date.now());
+  sendViewport();
   sound.frame(cam.x, cam.y, cam.zoom, app.screen.width / 2);
   // nothing moves when zoomed far out: while the camera rests too, draw a few times a second only
   const resting = Math.abs(cam.tx - cam.x) + Math.abs(cam.ty - cam.y) < 0.5 && Math.abs(cam.tz - cam.zoom) < 0.002;
@@ -1332,13 +1386,17 @@ if (!BASE && (info.view ? `${info.view[0]},${info.view[1]}` : 'all') !== viewMap
 setupMaps();
 let focus: { x: number; y: number; zoom?: number; band?: number } | null = null;
 try { focus = JSON.parse(sessionStorage.getItem('letopis.focus') ?? 'null'); sessionStorage.removeItem('letopis.focus'); } catch { /* none */ }
+// Settlements, terrain and controls are available immediately, but a large
+// world waits for camera intent before sending resident detail. Saved focus and
+// active tour preferences still open directly into detail.
+overviewUntilInteraction = !!snap.peopleDeferred && snap.population >= 25000 && !focus && !tour;
 if (focus) {
   lookAt(focus.x, focus.y, focus.zoom ?? 1.3, true);
   if (focus.band) void showGoneBand(focus.band);
 } else if (bands.length) {
   const cx = bands.reduce((s, b) => s + b.x, 0) / bands.length;
   const cy = bands.reduce((s, b) => s + b.y, 0) / bands.length;
-  lookAt(cx, cy, 1.3, true);
+  lookAt(cx, cy, overviewUntilInteraction ? 0.45 : 1.3, true);
 } else {
   const c = iso(info.w / 2, info.h / 2);
   cam.x = cam.tx = c.x; cam.y = cam.ty = c.y;

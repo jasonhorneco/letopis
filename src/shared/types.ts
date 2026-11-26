@@ -173,6 +173,8 @@ export interface SeaView { id: number; x: number; y: number; way: [number, numbe
 
 export interface TickMessage {
   t: 'tick';
+  /** Viewport revision for opted-in clients only. */
+  peopleRevision?: number;
   time: TimeInfo;
   bands: BandView[];
   people: PersonRow[];
@@ -189,6 +191,8 @@ export interface TickMessage {
 
 export interface SnapshotMessage {
   t: 'snapshot';
+  /** Individual rows arrive after subscribing to a region. */
+  peopleDeferred?: true;
   time: TimeInfo;
   bands: BandView[];
   people: PersonRow[];
@@ -205,6 +209,8 @@ export interface SnapshotMessage {
 }
 
 export interface PersonDetail {
+  /** For opted-in map viewers, the alive resident in current map coordinates. */
+  position?: PersonRow;
   id: number;
   name: string;
   sex: 0 | 1;

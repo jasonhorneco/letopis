@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Simulation, SimState } from './sim/sim';
 import { Store } from './db';
-import { Moving, View, movingOf, snapshotFor, tickFor, viewFor, worldInfoFor } from './views';
+import { Moving, PeopleRegion, View, localPeople, localPerson, movingOf, regionRows, snapshotFor, tickFor, viewFor, worldInfoFor } from './views';
 import { minimap } from './minimap';
 import { Discovery, SnapshotMessage, TickMessage, WorldInfo, b64encode, formatYear } from '../shared/types';
 import { TECHS } from './sim/tech';
@@ -317,8 +317,11 @@ function discoveries(sim: Simulation): Discovery[] {
   return out.sort((a, b) => a.year - b.year);
 }
 
-function snapshot(sm: Simulation, v: View): SnapshotMessage {
-  return snapshotFor(sm.use(), v, sm.timeInfo(SPEED));
+function snapshot(sm: Simulation, v: View, overview = false): SnapshotMessage {
+  sm.use();
+  const message = snapshotFor(sm, v, sm.timeInfo(SPEED), overview ? movingOf(sm, []) : undefined);
+  if (overview) message.peopleDeferred = true;
+  return message;
 }
 
 const server = http.createServer((req, res) => {
@@ -343,7 +346,7 @@ const server = http.createServer((req, res) => {
       res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'public, max-age=300' });
       return res.end(img);
     }
-    if (p === '/api/snapshot') return json(res, snapshot(sim2, view));
+    if (p === '/api/snapshot') return json(res, snapshot(sim2, view, url.searchParams.get('overview') === '1'));
     if (p === '/api/chronicle') return json(res, store.chronicle(world, { before: q('before'), after: q('after'), min: q('min'), limit: q('limit'), fromYear: q('fromYear') }));
     if (p === '/api/since') {
       const after = q('after') ?? 0;
@@ -406,8 +409,10 @@ const server = http.createServer((req, res) => {
       return gone ? json(res, { gone }) : json(res, { error: 'няма такъв род' }, 404);
     }
     if (p.startsWith('/api/person/')) {
-      const d = sim2.personDetail(Number(p.split('/').pop()));
-      return d ? json(res, d) : json(res, { error: 'няма такъв човек' }, 404);
+      const id = Number(p.split('/').pop()), d = sim2.personDetail(id);
+      if (!d) return json(res, { error: 'няма такъв човек' }, 404);
+      if (url.searchParams.get('position') === '1') d.position = localPerson(sim2.personRow(id), view);
+      return json(res, d);
     }
     // static files
     let file = path.normalize(path.join(PUBLIC, p === '/' ? 'index.html' : p));
@@ -434,44 +439,87 @@ const server = http.createServer((req, res) => {
   }
 });
 
-// every tick carries all the people: compressed it is about a fifth of the size
-const wss = new WebSocketServer({ noServer: true, perMessageDeflate: { threshold: 4096, zlibDeflateOptions: { level: 3 } } });
-/** every viewer and the map it looks at (`?map=gx,gy`, or the whole world) */
-const clients = new Map<WebSocket, string | null>();
-const marsClients = new Map<WebSocket, string | null>();
+const wss = new WebSocketServer({ noServer: true, maxPayload: 1024, perMessageDeflate: { threshold: 4096, zlibDeflateOptions: { level: 3 } } });
+interface Viewer {
+  map: string | null;
+  overview: boolean;
+  region: PeopleRegion | null;
+  revision: number;
+  answeredAt: number;
+}
+const clients = new Map<WebSocket, Viewer>();
+const marsClients = new Map<WebSocket, Viewer>();
+
+function parseRegion(m: unknown): PeopleRegion | null | undefined {
+  if (!m || typeof m !== 'object') return undefined;
+  const { left, top, right, bottom, focus } = m as { left?: unknown; top?: unknown; right?: unknown; bottom?: unknown; focus?: unknown };
+  const focused = typeof focus === 'number' && Number.isSafeInteger(focus) && focus > 0 ? focus : undefined;
+  if (left === undefined && top === undefined && right === undefined && bottom === undefined && focused !== undefined) return { focus: focused };
+  if (typeof left !== 'number' || typeof top !== 'number' || typeof right !== 'number' || typeof bottom !== 'number') return undefined;
+  if (![left, top, right, bottom].every((n) => Number.isFinite(n) && Math.abs(n) <= 1_000_000) || right < left || bottom < top) return undefined;
+  return { left, top, right, bottom, ...(focused !== undefined ? { focus: focused } : {}) };
+}
 server.on('upgrade', (req, socket, head) => {
   const u = new URL(req.url ?? '/', 'http://x'), p = u.pathname, map = u.searchParams.get('map');
   if (p !== '/ws' && p !== '/mars/ws') { socket.destroy(); return; }
   const onMars = p === '/mars/ws' && !!mars;
   wss.handleUpgrade(req, socket, head, (ws) => {
     const set = onMars ? marsClients : clients;
-    set.set(ws, map);
+    const viewer: Viewer = { map, overview: u.searchParams.get('overview') === '1', region: null, revision: 0, answeredAt: -Infinity };
+    set.set(ws, viewer);
     const sm = onMars ? mars! : sim;
-    ws.send(JSON.stringify(snapshot(sm, viewFor(sm.use(), map))));
+    ws.send(JSON.stringify(snapshot(sm, viewFor(sm.use(), map), viewer.overview)));
     sim.use();
+    if (viewer.overview) ws.on('message', (raw) => {
+      let request: { t?: unknown; revision?: number; region?: unknown } | null;
+      try { request = JSON.parse(raw.toString()); } catch { return; }
+      if (!request || request.t !== 'viewport' || !Number.isSafeInteger(request.revision) || request.revision! <= viewer.revision) return;
+      const region = request.region === null ? null : parseRegion(request.region);
+      if (region === undefined) return;
+      viewer.revision = request.revision!;
+      viewer.region = region;
+      const now = Date.now();
+      if (now - viewer.answeredAt < 120) return; // subsequent ticks still use the latest region
+      viewer.answeredAt = now;
+      const current = onMars ? mars : sim;
+      if (!current) return;
+      const v = viewFor(current.use(), map);
+      ws.send(JSON.stringify({ t: 'people', revision: viewer.revision, people: localPeople(regionRows(current, v, region), v) }));
+      sim.use();
+    });
     ws.on('close', () => set.delete(ws));
     ws.on('error', () => set.delete(ws));
   });
 });
 
-function broadcast(sim: Simulation, clients: Map<WebSocket, string | null>, pendingEvents: TickMessage['events']) {
+function broadcast(sim: Simulation, clients: Map<WebSocket, Viewer>, pendingEvents: TickMessage['events']) {
   if (!clients.size) {
     sim.treeChanges = [];
     sim.roadChanges = [];
     return;
   }
   const base = { time: sim.timeInfo(SPEED), events: pendingEvents, population: sim.s.people.length };
-  const all: Moving = movingOf(sim);
+  const common: Moving = movingOf(sim, []);
+  let full: Moving | undefined;
   const explored = sim.exploredDirty;
   sim.exploredDirty = false;
   // one message for every map somebody looks at
   const sent = new Map<string, string>();
-  for (const [ws, map] of clients) {
+  for (const [ws, viewer] of clients) {
     if (ws.readyState !== WebSocket.OPEN) continue;
-    const v = viewFor(sim, map);
-    let data = sent.get(v.key);
-    if (!data) sent.set(v.key, (data = JSON.stringify(tickFor(sim, v, base, all, explored, sim.treeChanges, sim.roadChanges))));
-    ws.send(data);
+    const v = viewFor(sim, viewer.map);
+    if (viewer.overview) {
+      const m = tickFor(sim, v, base, { ...common, people: regionRows(sim, v, viewer.region) }, explored, sim.treeChanges, sim.roadChanges);
+      m.peopleRevision = viewer.revision;
+      ws.send(JSON.stringify(m));
+    } else {
+      let data = sent.get(v.key);
+      if (!data) {
+        full ??= { ...common, people: sim.personRows() };
+        sent.set(v.key, (data = JSON.stringify(tickFor(sim, v, base, full, explored, sim.treeChanges, sim.roadChanges))));
+      }
+      ws.send(data);
+    }
   }
   sim.treeChanges = [];
   sim.roadChanges = [];
