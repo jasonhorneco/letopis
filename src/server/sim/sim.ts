@@ -1826,6 +1826,38 @@ export class Simulation {
   }
 
   private lifeAndDeath(members: Map<number, Person[]>) {
+    const pendingDeaths = new Set<Person>();
+    let babies: [Band, Person, Person | null][];
+    try {
+      babies = this.monthlyMortality(members, pendingDeaths);
+    } finally {
+      // Mortality takes its population count up front and looks up live relatives
+      // through byId. Remove from the global array before births or later phases.
+      if (pendingDeaths.size) {
+        const people = this.s.people;
+        let survivors = 0;
+        for (const p of people) if (!pendingDeaths.has(p)) people[survivors++] = p;
+        people.length = survivors;
+      }
+    }
+    for (const [b, mother, father] of babies) {
+      if (!this.byId.has(mother.id)) continue;
+      const twins = this.rng.chance(0.012);
+      for (let k = 0; k < (twins ? 2 : 1); k++) {
+        const child = this.newPerson(b, mother, father, this.s.tick, this.rng.chance(0.5) ? 1 : 0);
+        mother.children.push(child.id);
+        father?.children.push(child.id);
+        child.x = mother.x; child.y = mother.y;
+        if (twins && k === 1) {
+          this.emit('twins', 1, `В ${this.bandLabel(b)} ${this.nameOf(mother)} роди близнаци.`, `В ${this.bandLabel(b)} се родиха близнаци!`, child.id, b.id, [this.pRef(mother)],
+            [`In ${this.bandEnLabel(b)}, ${this.nameEn(mother)} gave birth to twins.`, `Twins were born in ${this.bandEnLabel(b)}!`],
+            [`${this.bWith('in', b, true)} brachte ${this.nameDe(mother)} Zwillinge zur Welt.`, `${this.bWith('in', b, true)} wurden Zwillinge geboren!`]);
+        }
+      }
+    }
+  }
+
+  private monthlyMortality(members: Map<number, Person[]>, pendingDeaths: Set<Person>) {
     // a gentle hand that keeps a tiny humanity from vanishing too early
     const pop = this.s.people.length;
     const guardian = pop < 40 ? 0.45 : pop < 80 ? 0.65 : pop < 150 ? 0.85 : 1;
@@ -1869,7 +1901,7 @@ export class Simulation {
           const cause = p.fame ? famousDeath(FAMOUS[p.fame - 1], a) : hungry > 0.25 && this.rng.chance(0.6) ? 'почина в гладна година'
             : coldRisk > 0.004 && this.rng.chance(0.5) ? 'почина в лютата зима'
             : a > 55 ? 'почина от старост' : a < 5 ? 'почина като дете' : 'почина от болест';
-          this.die(p, cause, m);
+          this.die(p, cause, m, false, pendingDeaths);
           continue;
         }
         // a rare long life: the band honours its old ones
@@ -1898,29 +1930,18 @@ export class Simulation {
         }
       }
     }
-    for (const [b, mother, father] of babies) {
-      if (!this.byId.has(mother.id)) continue;
-      const twins = this.rng.chance(0.012);
-      for (let k = 0; k < (twins ? 2 : 1); k++) {
-        const child = this.newPerson(b, mother, father, this.s.tick, this.rng.chance(0.5) ? 1 : 0);
-        mother.children.push(child.id);
-        father?.children.push(child.id);
-        child.x = mother.x; child.y = mother.y;
-        if (twins && k === 1) {
-          this.emit('twins', 1, `В ${this.bandLabel(b)} ${this.nameOf(mother)} роди близнаци.`, `В ${this.bandLabel(b)} се родиха близнаци!`, child.id, b.id, [this.pRef(mother)],
-            [`In ${this.bandEnLabel(b)}, ${this.nameEn(mother)} gave birth to twins.`, `Twins were born in ${this.bandEnLabel(b)}!`],
-            [`${this.bWith('in', b, true)} brachte ${this.nameDe(mother)} Zwillinge zur Welt.`, `${this.bWith('in', b, true)} wurden Zwillinge geboren!`]);
-        }
-      }
-    }
+    return babies;
   }
 
-  private die(p: Person, cause: string, bandMembers?: Person[], quiet = false) {
+  private die(p: Person, cause: string, bandMembers?: Person[], quiet = false, pendingDeaths?: Set<Person>) {
     if (!this.byId.has(p.id)) return;
     const b = this.bandById.get(p.bandId);
     this.byId.delete(p.id);
-    const i = this.s.people.indexOf(p);
-    if (i >= 0) this.s.people.splice(i, 1);
+    if (pendingDeaths) pendingDeaths.add(p);
+    else {
+      const i = this.s.people.indexOf(p);
+      if (i >= 0) this.s.people.splice(i, 1);
+    }
     if (bandMembers) {
       const j = bandMembers.indexOf(p);
       if (j >= 0) bandMembers.splice(j, 1);
